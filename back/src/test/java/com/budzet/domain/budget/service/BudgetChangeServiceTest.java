@@ -373,6 +373,7 @@ public class BudgetChangeServiceTest {
 
         User user = mock(User.class);
         UserRoomConnection connection = mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection = mock(UserRoomConnection.class); // 대상 유저 멤버 검증용
         BudgetChange budgetChange = mock(BudgetChange.class);
         BudgetRequest budgetRequest = mock(BudgetRequest.class);
         Room room = mock(Room.class);
@@ -381,7 +382,15 @@ public class BudgetChangeServiceTest {
         when(connection.getAuthority()).thenReturn(Authority.OWNER);
 
         when(userRepository.findByNameAndEmail("홍길동", "test@test.com")).thenReturn(Optional.of(user));
+
+        // 새로 추가된 대상 유저의 방 멤버 검증 모킹
+        when(budgetService.validateRoomMember(roomId, user.getId())).thenReturn(targetConnection);
+
         when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.of(budgetChange));
+
+        // 새로 추가된 정산 타입 검증 모킹 (SETTLEMENT 리턴)
+        when(budgetChange.getType()).thenReturn(BudgetType.SETTLEMENT);
+
         when(budgetChange.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
         when(budgetChange.getUser()).thenReturn(user);
@@ -498,7 +507,7 @@ public class BudgetChangeServiceTest {
     }
 
     @Test
-    @DisplayName("정산 수정 실패 - 해당 방의 정산 내역이 아닐 때")
+    @DisplayName("정산 수정 실패 - 유효하지 않은 방의 정산건인 경우")
     void updateBudgetChange_invalidRoomId() {
         // given
         Long roomId = 1L;
@@ -511,13 +520,21 @@ public class BudgetChangeServiceTest {
 
         User user = mock(User.class);
         UserRoomConnection connection = mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection = mock(UserRoomConnection.class);
         BudgetChange budgetChange = mock(BudgetChange.class);
         Room otherRoom = mock(Room.class);
 
         when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
         when(connection.getAuthority()).thenReturn(Authority.OWNER);
         when(userRepository.findByNameAndEmail(any(), any())).thenReturn(Optional.of(user));
+
+        // 대상 유저 멤버 검증 모킹 추가
+        when(budgetService.validateRoomMember(roomId, user.getId())).thenReturn(targetConnection);
+
         when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.of(budgetChange));
+
+        // 정산 타입 검증 모킹 추가
+        when(budgetChange.getType()).thenReturn(BudgetType.SETTLEMENT);
 
         when(budgetChange.getRoom()).thenReturn(otherRoom);
         when(otherRoom.getId()).thenReturn(otherRoomId); // 다른 방 ID
@@ -547,13 +564,22 @@ public class BudgetChangeServiceTest {
 
         User user = mock(User.class);
         UserRoomConnection connection = mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection = mock(UserRoomConnection.class); // 대상 유저 멤버 검증용
         BudgetChange budgetChange = mock(BudgetChange.class);
         Room room = mock(Room.class);
 
         when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
         when(connection.getAuthority()).thenReturn(Authority.OWNER);
         when(userRepository.findByNameAndEmail(any(), any())).thenReturn(Optional.of(user));
+
+        // 새로 추가된 대상 유저의 방 멤버 검증 모킹
+        when(budgetService.validateRoomMember(roomId, user.getId())).thenReturn(targetConnection);
+
         when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.of(budgetChange));
+
+        // 새로 추가된 정산 타입 검증 모킹 (SETTLEMENT 리턴)
+        when(budgetChange.getType()).thenReturn(BudgetType.SETTLEMENT);
+
         when(budgetChange.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
 
