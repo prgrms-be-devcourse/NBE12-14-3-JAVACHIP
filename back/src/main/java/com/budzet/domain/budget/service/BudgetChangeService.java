@@ -138,8 +138,16 @@ public class BudgetChangeService {
         User user = userRepository.findByNameAndEmail(updateRequest.userName(),updateRequest.userEmail())
                 .orElseThrow(()-> new BusinessException(ErrorCode.BAD_REQUEST,"유저 이름과 이메일이 일치하지 않습니다."));
 
+        //입력 받은 유저의 아이디가 모임에 존재하는지 확인
+        budgetService.validateRoomMember(roomId, user.getId());
+
         BudgetChange budgetChange = budgetChangeRepository.findById(changeId)
                 .orElseThrow(()-> new BusinessException(ErrorCode.BUDGET_CHANGE_NOT_FOUND));
+
+        //수정하려는 정산건의 타입이 SETTLEMENT인지 확인
+        if(!BudgetType.SETTLEMENT.equals(budgetChange.getType())){
+            throw new BusinessException(ErrorCode.BAD_REQUEST,"정산(SETTLEMENT) 타입의 내역만 수정할 수 있습니다.");
+        }
 
         if(!budgetChange.getRoom().getId().equals(roomId)){
             throw new BusinessException(ErrorCode.BAD_REQUEST,"유효한 정산내역이 아닙니다.");
