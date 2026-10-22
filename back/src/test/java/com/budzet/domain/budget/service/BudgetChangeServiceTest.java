@@ -19,17 +19,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class BudgetChangeServiceTest {
+class BudgetChangeServiceTest {
 
     @Mock
     private BudgetChangeRepository budgetChangeRepository;
@@ -46,91 +47,211 @@ public class BudgetChangeServiceTest {
     @InjectMocks
     private BudgetChangeService budgetChangeService;
 
+
+    // =========================
+    // 정산 등록
+    // =========================
+
     @Test
-    @DisplayName("정산 등록 성공 - 정상적으로 예산이 차감되고 변경 이력이 저장됨")
+    @DisplayName("정산 등록 성공 - 예산 차감 및 변경 이력 저장")
     void createBudgetChange_success() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long requestId = 10L;
 
-        BudgetChangeCreateRequest request = new BudgetChangeCreateRequest(8000L, "실제 장비 구매 영수증 첨부");
+        BudgetChangeCreateRequest request =
+                new BudgetChangeCreateRequest(
+                        8000L,
+                        "실제 장비 구매 영수증 첨부"
+                );
 
         User user = mock(User.class);
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        BudgetRequest budgetRequest = mock(BudgetRequest.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        BudgetRequest budgetRequest =
+                mock(BudgetRequest.class);
         Room room = mock(Room.class);
 
         when(room.getId()).thenReturn(roomId);
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(connection.getUser()).thenReturn(user);
 
-        when(budgetRequestRepository.findById(requestId)).thenReturn(Optional.of(budgetRequest));
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(connection.getUser()).thenReturn(user);
+        when(user.getId()).thenReturn(userId);
+        when(user.getName()).thenReturn("홍길동");
+
+        when(budgetRequestRepository.findById(requestId))
+                .thenReturn(Optional.of(budgetRequest));
+
+        when(budgetRequest.getId()).thenReturn(requestId);
         when(budgetRequest.getRoom()).thenReturn(room);
         when(budgetRequest.getUser()).thenReturn(user);
-        when(user.getId()).thenReturn(userId);
         when(budgetRequest.getStatus()).thenReturn("APPROVE");
         when(budgetRequest.getRequestedAmount()).thenReturn(10000L);
 
-        when(budgetService.findByRoomIdWithLock(roomId)).thenReturn(room);
+        when(budgetService.findByRoomIdWithLock(roomId))
+                .thenReturn(room);
 
-        when(budgetChangeRepository.save(any(BudgetChange.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(budgetChangeRepository.save(any(BudgetChange.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        BudgetChangeCreateResponse response = budgetChangeService.createBudgetChange(roomId, userId, requestId, request);
+        BudgetChangeCreateResponse response =
+                budgetChangeService.createBudgetChange(
+                        roomId, userId, requestId, request
+                );
 
         // then
         assertNotNull(response);
+        assertEquals(requestId, response.requestId());
+        assertEquals(userId, response.userId());
         assertEquals(10000L, response.changeBudget());
         assertEquals(8000L, response.changedBudget());
         assertEquals(BudgetType.SETTLEMENT, response.budgetType());
+        assertEquals("홍길동", response.userName());
+        assertEquals("실제 장비 구매 영수증 첨부", response.reason());
 
-        verify(room, times(1)).settleBudget(10000L, 8000L);
-        verify(budgetChangeRepository, times(1)).save(any(BudgetChange.class));
+        // 예산 정산 메서드 호출 검증
+        verify(room).settleBudget(10000L, 8000L);
+
+        // 신청 상태 변경 메서드 호출 검증
+        verify(budgetRequest).changeToSettlement();
+
+        // 모임과 정산 내역의 연결 메서드 호출 검증
+        verify(room).addBudgetChange(any(BudgetChange.class));
+
+        // 정산 내역 저장 메서드 호출 검증
+        verify(budgetChangeRepository).save(any(BudgetChange.class));
     }
 
     @Test
     @DisplayName("정산 등록 실패 - 신청서가 존재하지 않을 때")
     void createBudgetChange_requestNotFound() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long requestId = 10L;
-        BudgetChangeCreateRequest request = new BudgetChangeCreateRequest(8000L, "정산 사유");
 
-        UserRoomConnection connection = mock(UserRoomConnection.class);
+        BudgetChangeCreateRequest request =
+                new BudgetChangeCreateRequest(8000L, "정산 사유");
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(budgetRequestRepository.findById(requestId)).thenReturn(Optional.empty());
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
 
-        // when & then
-        assertThrows(
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(budgetRequestRepository.findById(requestId))
+                .thenReturn(Optional.empty());
+
+        // when
+        BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.createBudgetChange(roomId, userId, requestId, request)
+                () -> budgetChangeService.createBudgetChange(
+                        roomId, userId, requestId, request
+                )
         );
 
-        verify(budgetService, never()).findByRoomIdWithLock(any());
-        verify(budgetChangeRepository, never()).save(any());
+        // then
+        assertEquals(
+                ErrorCode.BUDGET_REQUEST_NOT_FOUND,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "해당 예산신청이 존재하지 않습니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
+
+        verify(budgetChangeRepository, never())
+                .save(any());
+    }
+
+    @Test
+    @DisplayName("정산 등록 실패 - 다른 모임의 신청서를 전달했을 때")
+    void createBudgetChange_requestFromDifferentRoom() {
+
+        // given
+        Long roomId = 1L;
+        Long otherRoomId = 2L;
+        Long userId = 100L;
+        Long requestId = 10L;
+
+        BudgetChangeCreateRequest request =
+                new BudgetChangeCreateRequest(8000L, "정산 사유");
+
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        BudgetRequest budgetRequest =
+                mock(BudgetRequest.class);
+        Room otherRoom = mock(Room.class);
+
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(budgetRequestRepository.findById(requestId))
+                .thenReturn(Optional.of(budgetRequest));
+
+        when(budgetRequest.getRoom()).thenReturn(otherRoom);
+        when(otherRoom.getId()).thenReturn(otherRoomId);
+
+        // when
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> budgetChangeService.createBudgetChange(
+                        roomId, userId, requestId, request
+                )
+        );
+
+        // then
+        assertEquals(
+                ErrorCode.BAD_REQUEST,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "해당 모임의 신청건이 아닙니다.",
+                exception.getMessage()
+        );
+
+        // 모임이 일치하지 않으면 락 조회와 저장은 실행되지 않아야 함
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
+
+        verify(budgetChangeRepository, never())
+                .save(any());
     }
 
     @Test
     @DisplayName("정산 등록 실패 - 신청서의 작성자가 아닐 때")
     void createBudgetChange_forbiddenRequestWriter() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long otherUserId = 200L;
         Long requestId = 10L;
 
-        BudgetChangeCreateRequest request = new BudgetChangeCreateRequest(8000L, "정산 사유");
+        BudgetChangeCreateRequest request =
+                new BudgetChangeCreateRequest(8000L, "정산 사유");
 
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        BudgetRequest budgetRequest = mock(BudgetRequest.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        BudgetRequest budgetRequest =
+                mock(BudgetRequest.class);
         User writerUser = mock(User.class);
         Room room = mock(Room.class);
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(budgetRequestRepository.findById(requestId)).thenReturn(Optional.of(budgetRequest));
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(budgetRequestRepository.findById(requestId))
+                .thenReturn(Optional.of(budgetRequest));
 
         when(budgetRequest.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
@@ -138,468 +259,1040 @@ public class BudgetChangeServiceTest {
         when(budgetRequest.getUser()).thenReturn(writerUser);
         when(writerUser.getId()).thenReturn(otherUserId);
 
-        // when & then
-        assertThrows(
+        // when
+        BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.createBudgetChange(roomId, userId, requestId, request)
+                () -> budgetChangeService.createBudgetChange(
+                        roomId, userId, requestId, request
+                )
         );
 
-        verify(budgetChangeRepository, never()).save(any());
+        // then
+        assertEquals(
+                ErrorCode.FORBIDDEN_REQUEST_WRITER,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "해당 신청의 신청자만 정산할 수 있습니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
+
+        verify(budgetChangeRepository, never())
+                .save(any());
     }
 
     @Test
-    @DisplayName("정산 등록 실패 - 승인(APPROVED)된 요청이 아닐 때")
+    @DisplayName("정산 등록 실패 - 승인된 신청이 아닐 때")
     void createBudgetChange_notApproved() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long requestId = 10L;
 
-        BudgetChangeCreateRequest request = new BudgetChangeCreateRequest(8000L, "정산 사유");
+        BudgetChangeCreateRequest request =
+                new BudgetChangeCreateRequest(8000L, "정산 사유");
 
         User user = mock(User.class);
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        BudgetRequest budgetRequest = mock(BudgetRequest.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        BudgetRequest budgetRequest =
+                mock(BudgetRequest.class);
         Room room = mock(Room.class);
+
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(budgetRequestRepository.findById(requestId))
+                .thenReturn(Optional.of(budgetRequest));
 
         when(budgetRequest.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
-
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(budgetRequestRepository.findById(requestId)).thenReturn(Optional.of(budgetRequest));
 
         when(budgetRequest.getUser()).thenReturn(user);
         when(user.getId()).thenReturn(userId);
         when(budgetRequest.getStatus()).thenReturn("PENDING");
 
-        // when & then
-        assertThrows(
+        // when
+        BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.createBudgetChange(roomId, userId, requestId, request)
+                () -> budgetChangeService.createBudgetChange(
+                        roomId, userId, requestId, request
+                )
         );
 
-        verify(budgetChangeRepository, never()).save(any());
+        // then
+        assertEquals(
+                ErrorCode.BUDGET_REQUEST_NOT_APPROVED,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "승인된 예산 신청 건이 아닙니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
+
+        verify(budgetChangeRepository, never())
+                .save(any());
     }
 
     @Test
-    @DisplayName("정산 등록 실패 - 방 멤버가 아닐 때")
+    @DisplayName("정산 등록 실패 - 모임 멤버가 아닐 때")
     void createBudgetChange_userNotJoinedRoom() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long requestId = 10L;
-        BudgetChangeCreateRequest request = new BudgetChangeCreateRequest(8000L, "정산 사유");
+
+        BudgetChangeCreateRequest request =
+                new BudgetChangeCreateRequest(8000L, "정산 사유");
 
         when(budgetService.validateRoomMember(roomId, userId))
-                .thenThrow(new BusinessException(null, "사용자가 방에 속해있지 않습니다."));
+                .thenThrow(
+                        new BusinessException(
+                                ErrorCode.USER_NOT_JOINED_ROOM
+                        )
+                );
 
-        // when & then
-        assertThrows(
+        // when
+        BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.createBudgetChange(roomId, userId, requestId, request)
+                () -> budgetChangeService.createBudgetChange(
+                        roomId, userId, requestId, request
+                )
         );
 
-        verify(budgetRequestRepository, never()).findById(any());
-        verify(budgetChangeRepository, never()).save(any());
+        // then
+        assertEquals(
+                ErrorCode.USER_NOT_JOINED_ROOM,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "사용자가 방에 속해있지 않습니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetRequestRepository, never())
+                .findById(any());
+
+        verify(budgetChangeRepository, never())
+                .save(any());
     }
 
+
+    // =========================
+    // 정산 내역 목록 조회
+    // =========================
+
     @Test
-    @DisplayName("정산 내역 목록 조회 성공 - SETTLEMENT 타입의 내역만 최신순 반환")
+    @DisplayName("정산 내역 목록 조회 성공 - 정산 유형 조건으로 조회")
     void budgetChangeList_success() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
 
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        BudgetChange settlementChange1 = mock(BudgetChange.class);
-        BudgetChange settlementChange2 = mock(BudgetChange.class);
-        List<BudgetChange> settlementChanges = List.of(settlementChange1, settlementChange2);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(budgetChangeRepository.findAllByRoomIdAndTypeOrderByCreatedAtDesc(roomId, BudgetType.SETTLEMENT))
+        BudgetChange settlementChange1 =
+                mock(BudgetChange.class);
+        BudgetChange settlementChange2 =
+                mock(BudgetChange.class);
+
+        List<BudgetChange> settlementChanges =
+                List.of(settlementChange1, settlementChange2);
+
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(budgetChangeRepository
+                .findAllByRoomIdAndTypeOrderByCreatedAtDesc(
+                        roomId, BudgetType.SETTLEMENT
+                ))
                 .thenReturn(settlementChanges);
 
         // when
-        BudgetChangeListResponse response = budgetChangeService.budgetChangeList(roomId, userId);
+        BudgetChangeListResponse response =
+                budgetChangeService.budgetChangeList(roomId, userId);
 
         // then
         assertNotNull(response);
+        assertEquals(2, response.changes().size());
 
-        // 검증 1: 방 멤버 검증 호출 확인
-        verify(budgetService, times(1)).validateRoomMember(roomId, userId);
+        verify(budgetService)
+                .validateRoomMember(roomId, userId);
 
-        // 검증 2: roomId와 BudgetType.SETTLEMENT 조건으로 조회가 발생했는지 확인
-        verify(budgetChangeRepository, times(1))
-                .findAllByRoomIdAndTypeOrderByCreatedAtDesc(eq(roomId), eq(BudgetType.SETTLEMENT));
+        verify(budgetChangeRepository)
+                .findAllByRoomIdAndTypeOrderByCreatedAtDesc(
+                        eq(roomId),
+                        eq(BudgetType.SETTLEMENT)
+                );
     }
 
     @Test
-    @DisplayName("정산 내역 목록 조회 실패 - 방 멤버가 아닐 때")
+    @DisplayName("정산 내역 목록 조회 실패 - 모임 멤버가 아닐 때")
     void budgetChangeList_userNotJoinedRoom() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
 
-        // 멤버 검증 시 예외 발생 모킹
         when(budgetService.validateRoomMember(roomId, userId))
-                .thenThrow(new BusinessException(null, "사용자가 방에 속해있지 않습니다."));
+                .thenThrow(
+                        new BusinessException(
+                                ErrorCode.USER_NOT_JOINED_ROOM
+                        )
+                );
 
-        // when & then
-        assertThrows(
+        // when
+        BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.budgetChangeList(roomId, userId)
+                () -> budgetChangeService.budgetChangeList(
+                        roomId, userId
+                )
         );
 
-        // 검증: 멤버 검증 실패 시 DB 조회가 실행되지 않아야 함
+        // then
+        assertEquals(
+                ErrorCode.USER_NOT_JOINED_ROOM,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "사용자가 방에 속해있지 않습니다.",
+                exception.getMessage()
+        );
+
         verify(budgetChangeRepository, never())
-                .findAllByRoomIdAndTypeOrderByCreatedAtDesc(anyLong(), any());
+                .findAllByRoomIdAndTypeOrderByCreatedAtDesc(
+                        anyLong(), any()
+                );
     }
 
     @Test
-    @DisplayName("정산 내역 목록 조회 성공 - 정산 내역이 없는 경우 빈 리스트 반환")
+    @DisplayName("정산 내역 목록 조회 성공 - 내역이 없을 때 빈 목록 반환")
     void budgetChangeList_emptyList() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
 
-        UserRoomConnection connection = mock(UserRoomConnection.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(budgetChangeRepository.findAllByRoomIdAndTypeOrderByCreatedAtDesc(roomId, BudgetType.SETTLEMENT))
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(budgetChangeRepository
+                .findAllByRoomIdAndTypeOrderByCreatedAtDesc(
+                        roomId, BudgetType.SETTLEMENT
+                ))
                 .thenReturn(Collections.emptyList());
 
         // when
-        BudgetChangeListResponse response = budgetChangeService.budgetChangeList(roomId, userId);
+        BudgetChangeListResponse response =
+                budgetChangeService.budgetChangeList(roomId, userId);
 
         // then
         assertNotNull(response);
+        assertTrue(response.changes().isEmpty());
 
-        verify(budgetService, times(1)).validateRoomMember(roomId, userId);
-        verify(budgetChangeRepository, times(1))
-                .findAllByRoomIdAndTypeOrderByCreatedAtDesc(eq(roomId), eq(BudgetType.SETTLEMENT));
+        verify(budgetService)
+                .validateRoomMember(roomId, userId);
+
+        verify(budgetChangeRepository)
+                .findAllByRoomIdAndTypeOrderByCreatedAtDesc(
+                        eq(roomId),
+                        eq(BudgetType.SETTLEMENT)
+                );
     }
 
+
+    // =========================
+    // 정산 내역 상세 조회
+    // =========================
+
     @Test
-    @DisplayName("예산 변경 내역 상세 조회 성공")
+    @DisplayName("정산 내역 상세 조회 성공")
     void budgetChangeDetail_success() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long changeId = 50L;
         Long requestId = 30L;
 
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        BudgetChange budgetChange = mock(BudgetChange.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        BudgetChange budgetChange =
+                mock(BudgetChange.class);
         Room room = mock(Room.class);
         User user = mock(User.class);
-        BudgetRequest request = mock(BudgetRequest.class);
+        BudgetRequest request =
+                mock(BudgetRequest.class);
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.of(budgetChange));
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(budgetChangeRepository.findById(changeId))
+                .thenReturn(Optional.of(budgetChange));
+
         when(budgetChange.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
+
         when(budgetChange.getUser()).thenReturn(user);
         when(user.getId()).thenReturn(userId);
+
         when(budgetChange.getRequest()).thenReturn(request);
         when(request.getId()).thenReturn(requestId);
 
         // when
-        BudgetChangeDetailResponse response = budgetChangeService.budgetChangeDetail(roomId, userId, changeId);
+        BudgetChangeDetailResponse response =
+                budgetChangeService.budgetChangeDetail(
+                        roomId, userId, changeId
+                );
 
         // then
         assertNotNull(response);
 
-        verify(budgetService, times(1)).validateRoomMember(roomId, userId);
-        verify(budgetChangeRepository, times(1)).findById(changeId);
+        verify(budgetService)
+                .validateRoomMember(roomId, userId);
+
+        verify(budgetChangeRepository)
+                .findById(changeId);
     }
 
     @Test
-    @DisplayName("예산 변경 내역 상세 조회 실패 - 해당 내역이 존재하지 않을 때")
+    @DisplayName("정산 내역 상세 조회 실패 - 해당 내역이 존재하지 않을 때")
     void budgetChangeDetail_notFound() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long changeId = 999L;
 
-        UserRoomConnection connection = mock(UserRoomConnection.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.empty());
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
 
-        // when & then
+        when(budgetChangeRepository.findById(changeId))
+                .thenReturn(Optional.empty());
+
+        // when
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.budgetChangeDetail(roomId, userId, changeId)
+                () -> budgetChangeService.budgetChangeDetail(
+                        roomId, userId, changeId
+                )
         );
 
-        assertEquals(ErrorCode.BUDGET_CHANGE_NOT_FOUND, exception.getErrorCode());
+        // then
+        assertEquals(
+                ErrorCode.BUDGET_CHANGE_NOT_FOUND,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "해당 정산내역이 존재하지 않습니다.",
+                exception.getMessage()
+        );
 
-        verify(budgetService, times(1)).validateRoomMember(roomId, userId);
-        verify(budgetChangeRepository, times(1)).findById(changeId);
+        verify(budgetService)
+                .validateRoomMember(roomId, userId);
+
+        verify(budgetChangeRepository)
+                .findById(changeId);
     }
 
     @Test
-    @DisplayName("예산 변경 내역 상세 조회 실패 - 방 멤버가 아닐 때")
+    @DisplayName("정산 내역 상세 조회 실패 - 모임 멤버가 아닐 때")
     void budgetChangeDetail_userNotJoinedRoom() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long changeId = 50L;
 
         when(budgetService.validateRoomMember(roomId, userId))
-                .thenThrow(new BusinessException(ErrorCode.USER_NOT_JOINED_ROOM));
+                .thenThrow(
+                        new BusinessException(
+                                ErrorCode.USER_NOT_JOINED_ROOM
+                        )
+                );
 
-        // when & then
-        assertThrows(
+        // when
+        BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.budgetChangeDetail(roomId, userId, changeId)
+                () -> budgetChangeService.budgetChangeDetail(
+                        roomId, userId, changeId
+                )
         );
 
-        verify(budgetChangeRepository, never()).findById(anyLong());
+        // then
+        assertEquals(
+                ErrorCode.USER_NOT_JOINED_ROOM,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "사용자가 방에 속해있지 않습니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetChangeRepository, never())
+                .findById(anyLong());
     }
 
     @Test
-    @DisplayName("정산 수정 성공 - 신청 금액 및 정산 금액이 정상 수정되고 예산이 반영됨")
+    @DisplayName("정산 내역 상세 조회 실패 - 다른 모임의 정산 내역일 때")
+    void budgetChangeDetail_invalidRoomId() {
+
+        // given
+        Long roomId = 1L;
+        Long otherRoomId = 2L;
+        Long userId = 100L;
+        Long changeId = 50L;
+
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        BudgetChange budgetChange =
+                mock(BudgetChange.class);
+        Room otherRoom = mock(Room.class);
+
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(budgetChangeRepository.findById(changeId))
+                .thenReturn(Optional.of(budgetChange));
+
+        when(budgetChange.getRoom()).thenReturn(otherRoom);
+        when(otherRoom.getId()).thenReturn(otherRoomId);
+
+        // when
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> budgetChangeService.budgetChangeDetail(
+                        roomId, userId, changeId
+                )
+        );
+
+        // then
+        assertEquals(
+                ErrorCode.BAD_REQUEST,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "해당 모임의 정산건이 아닙니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetChangeRepository)
+                .findById(changeId);
+    }
+
+
+    // =========================
+    // 정산 수정
+    // =========================
+
+    @Test
+    @DisplayName("정산 수정 성공 - 수정 금액과 정산 정보가 반영됨")
     void updateBudgetChange_success() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
+        Long targetUserId = 200L;
         Long changeId = 10L;
 
-        // DTO 파라미터 순서: (changeBudget, changedBudget, userName, userEmail, reason)
-        BudgetChangeUpdateRequest updateRequest = new BudgetChangeUpdateRequest(
-                6000L, 4000L, "홍길동", "test@test.com", "수정된 사유"
+        BudgetChangeUpdateRequest updateRequest =
+                new BudgetChangeUpdateRequest(
+                        6000L,
+                        4000L,
+                        "홍길동",
+                        "test@test.com",
+                        "수정된 사유"
+                );
+
+        User previousUser = mock(User.class);
+        User user = mock(User.class);
+
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection =
+                mock(UserRoomConnection.class);
+
+        Room room = mock(Room.class);
+        BudgetRequest budgetRequest =
+                mock(BudgetRequest.class);
+
+        // 실제 BudgetChange 엔티티를 사용해 필드 변경과 응답값 검증
+        BudgetChange budgetChange = new BudgetChange(
+                room,
+                previousUser,
+                "기존 사용자",
+                BudgetType.SETTLEMENT,
+                "기존 사유",
+                5000L,
+                3000L
         );
 
-        User user = mock(User.class);
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        UserRoomConnection targetConnection = mock(UserRoomConnection.class); // 대상 유저 멤버 검증용
-        BudgetChange budgetChange = mock(BudgetChange.class);
-        BudgetRequest budgetRequest = mock(BudgetRequest.class);
-        Room room = mock(Room.class);
+        // 기존 DB 조회 결과에 해당하는 ID 설정
+        ReflectionTestUtils.setField(
+                budgetChange, "id", changeId
+        );
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(connection.getAuthority()).thenReturn(Authority.OWNER);
+        // 연관된 신청 내역이 존재하는 경우를 설정
+        budgetChange.addBudgetRequest(budgetRequest);
 
-        when(userRepository.findByNameAndEmail("홍길동", "test@test.com")).thenReturn(Optional.of(user));
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
 
-        // 새로 추가된 대상 유저의 방 멤버 검증 모킹
-        when(budgetService.validateRoomMember(roomId, user.getId())).thenReturn(targetConnection);
+        when(connection.getAuthority())
+                .thenReturn(Authority.OWNER);
 
-        when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.of(budgetChange));
+        when(userRepository.findByNameAndEmail(
+                "홍길동", "test@test.com"
+        )).thenReturn(Optional.of(user));
 
-        // 새로 추가된 정산 타입 검증 모킹 (SETTLEMENT 리턴)
-        when(budgetChange.getType()).thenReturn(BudgetType.SETTLEMENT);
+        when(user.getId()).thenReturn(targetUserId);
+        when(user.getEmail()).thenReturn("test@test.com");
 
-        when(budgetChange.getRoom()).thenReturn(room);
+        when(budgetService.validateRoomMember(roomId, targetUserId))
+                .thenReturn(targetConnection);
+
+        when(budgetChangeRepository.findById(changeId))
+                .thenReturn(Optional.of(budgetChange));
+
         when(room.getId()).thenReturn(roomId);
-        when(budgetChange.getUser()).thenReturn(user);
 
-        // 락을 걸고 Room 조회
-        when(budgetService.findByRoomIdWithLock(roomId)).thenReturn(room);
+        when(budgetService.findByRoomIdWithLock(roomId))
+                .thenReturn(room);
 
-        // 기존 값: 신청금액 5000원 -> 수정 요청: 6000원 (+1000원)
-        when(budgetChange.getChangeBudget()).thenReturn(5000L);
-        // 가용예산 2000원 남아있어 1000원 증액 가능
+        // 기존 신청 금액 5,000원에서 6,000원으로 증액
         when(room.getAvailableBudget()).thenReturn(2000L);
 
-        // 기존 값: 정산금액 3000원 -> 수정 요청: 4000원 (차액: -1000원)
-        when(budgetChange.getChangedBudget()).thenReturn(3000L);
-
-        when(budgetChange.getRequest()).thenReturn(budgetRequest);
-
         // when
-        BudgetChangeUpdateResponse response = budgetChangeService.updateBudgetChange(roomId, userId, changeId, updateRequest);
+        BudgetChangeUpdateResponse response =
+                budgetChangeService.updateBudgetChange(
+                        roomId, userId, changeId, updateRequest
+                );
 
         // then
         assertNotNull(response);
 
-        // 1. 락 조회 호출 검증
-        verify(budgetService, times(1)).findByRoomIdWithLock(roomId);
+        // 락 조회 호출 검증
+        verify(budgetService)
+                .findByRoomIdWithLock(roomId);
 
-        // 2. 예산 차액 반영 호출 검증 (3000L - 4000L = -1000L)
-        verify(room, times(1)).updateTotalBudget(-1000L);
+        // 정산 금액 차액: 기존 3,000원 - 수정 후 4,000원 = -1,000원
+        verify(room)
+                .updateTotalBudget(-1000L);
 
-        // 3. Entity 수정 메서드 호출 검증
-        verify(budgetChange, times(1)).updateChange(updateRequest, user);
-        verify(budgetRequest, times(1)).updateRequest(budgetChange, user);
+        // BudgetChange 엔티티의 실제 필드 변경 검증
+        assertEquals(6000L, budgetChange.getChangeBudget());
+        assertEquals(4000L, budgetChange.getChangedBudget());
+        assertEquals("홍길동", budgetChange.getUserName());
+        assertEquals("수정된 사유", budgetChange.getReason());
+        assertSame(user, budgetChange.getUser());
+
+        // 수정 결과 DTO 검증
+        assertEquals(changeId, response.id());
+        assertEquals(6000L, response.changeBudget());
+        assertEquals(4000L, response.changedBudget());
+        assertEquals("홍길동", response.userName());
+        assertEquals("test@test.com", response.userEmail());
+        assertEquals("수정된 사유", response.reason());
+
+        // 연결된 신청 내역의 수정 메서드 호출 검증
+        verify(budgetRequest)
+                .updateRequest(budgetChange, user);
+
+        verify(budgetService)
+                .validateRoomMember(roomId, targetUserId);
     }
 
     @Test
-    @DisplayName("정산 수정 실패 - 방장(OWNER) 권한이 아닐 때")
+    @DisplayName("정산 수정 실패 - OWNER 권한이 아닐 때")
     void updateBudgetChange_forbiddenNotOwner() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long changeId = 10L;
-        BudgetChangeUpdateRequest updateRequest = new BudgetChangeUpdateRequest(
-                6000L, 4000L, "홍길동", "test@test.com", "수정 사유"
-        );
 
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(connection.getAuthority()).thenReturn(Authority.MEMBER); // 일반 멤버
+        BudgetChangeUpdateRequest updateRequest =
+                new BudgetChangeUpdateRequest(
+                        6000L,
+                        4000L,
+                        "홍길동",
+                        "test@test.com",
+                        "수정 사유"
+                );
 
-        // when & then
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(connection.getAuthority())
+                .thenReturn(Authority.MEMBER);
+
+        // when
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.updateBudgetChange(roomId, userId, changeId, updateRequest)
+                () -> budgetChangeService.updateBudgetChange(
+                        roomId, userId, changeId, updateRequest
+                )
         );
 
-        assertEquals(ErrorCode.FORBIDDEN_ACCESS, exception.getErrorCode());
-        verify(budgetService, never()).findByRoomIdWithLock(any());
+        // then
+        assertEquals(
+                ErrorCode.FORBIDDEN_ACCESS,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "해당 요청에 대한 권한이 없습니다.",
+                exception.getMessage()
+        );
+
+        verify(userRepository, never())
+                .findByNameAndEmail(anyString(), anyString());
+
+        verify(budgetChangeRepository, never())
+                .findById(anyLong());
+
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
     }
 
     @Test
-    @DisplayName("정산 수정 실패 - 유저 이름과 이메일이 일치하지 않을 때")
+    @DisplayName("정산 수정 실패 - 이름과 이메일에 해당하는 사용자가 없을 때")
     void updateBudgetChange_userNotFound() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
         Long changeId = 10L;
-        BudgetChangeUpdateRequest updateRequest = new BudgetChangeUpdateRequest(
-                6000L, 4000L, "없는유저", "wrong@test.com", "수정 사유"
-        );
 
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(connection.getAuthority()).thenReturn(Authority.OWNER);
+        BudgetChangeUpdateRequest updateRequest =
+                new BudgetChangeUpdateRequest(
+                        6000L,
+                        4000L,
+                        "없는유저",
+                        "wrong@test.com",
+                        "수정 사유"
+                );
 
-        when(userRepository.findByNameAndEmail("없는유저", "wrong@test.com")).thenReturn(Optional.empty());
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
 
-        // when & then
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(connection.getAuthority())
+                .thenReturn(Authority.OWNER);
+
+        when(userRepository.findByNameAndEmail(
+                "없는유저", "wrong@test.com"
+        )).thenReturn(Optional.empty());
+
+        // when
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.updateBudgetChange(roomId, userId, changeId, updateRequest)
+                () -> budgetChangeService.updateBudgetChange(
+                        roomId, userId, changeId, updateRequest
+                )
         );
 
-        assertEquals(ErrorCode.BAD_REQUEST, exception.getErrorCode());
-        verify(budgetService, never()).findByRoomIdWithLock(any());
+        // then
+        assertEquals(
+                ErrorCode.BAD_REQUEST,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "유저 이름과 이메일이 일치하지 않습니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
+
+        verify(budgetChangeRepository, never())
+                .findById(anyLong());
+    }
+
+    @Test
+    @DisplayName("정산 수정 실패 - 대상 사용자가 모임 멤버가 아닐 때")
+    void updateBudgetChange_targetUserNotJoinedRoom() {
+
+        // given
+        Long roomId = 1L;
+        Long userId = 100L;
+        Long targetUserId = 200L;
+        Long changeId = 10L;
+
+        BudgetChangeUpdateRequest updateRequest =
+                new BudgetChangeUpdateRequest(
+                        6000L,
+                        4000L,
+                        "홍길동",
+                        "test@test.com",
+                        "수정 사유"
+                );
+
+        User user = mock(User.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(connection.getAuthority())
+                .thenReturn(Authority.OWNER);
+
+        when(userRepository.findByNameAndEmail(
+                "홍길동", "test@test.com"
+        )).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(targetUserId);
+
+        when(budgetService.validateRoomMember(roomId, targetUserId))
+                .thenThrow(
+                        new BusinessException(
+                                ErrorCode.USER_NOT_JOINED_ROOM
+                        )
+                );
+
+        // when
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> budgetChangeService.updateBudgetChange(
+                        roomId, userId, changeId, updateRequest
+                )
+        );
+
+        // then
+        assertEquals(
+                ErrorCode.USER_NOT_JOINED_ROOM,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "사용자가 방에 속해있지 않습니다.",
+                exception.getMessage()
+        );
+
+        // 대상 사용자의 멤버십 검증 실패 후에는 정산 조회를 진행하지 않아야 함
+        verify(budgetChangeRepository, never())
+                .findById(anyLong());
+
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
     }
 
     @Test
     @DisplayName("정산 수정 실패 - 수정할 정산 내역이 존재하지 않을 때")
     void updateBudgetChange_budgetChangeNotFound() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
+        Long targetUserId = 200L;
         Long changeId = 10L;
-        BudgetChangeUpdateRequest updateRequest = new BudgetChangeUpdateRequest(
-                6000L, 4000L, "홍길동", "test@test.com", "수정 사유"
-        );
+
+        BudgetChangeUpdateRequest updateRequest =
+                new BudgetChangeUpdateRequest(
+                        6000L,
+                        4000L,
+                        "홍길동",
+                        "test@test.com",
+                        "수정 사유"
+                );
 
         User user = mock(User.class);
-        UserRoomConnection connection = mock(UserRoomConnection.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection =
+                mock(UserRoomConnection.class);
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(connection.getAuthority()).thenReturn(Authority.OWNER);
-        when(userRepository.findByNameAndEmail(any(), any())).thenReturn(Optional.of(user));
-        when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.empty());
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
 
-        // when & then
+        when(connection.getAuthority())
+                .thenReturn(Authority.OWNER);
+
+        when(userRepository.findByNameAndEmail(anyString(), anyString()))
+                .thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(targetUserId);
+
+        when(budgetService.validateRoomMember(roomId, targetUserId))
+                .thenReturn(targetConnection);
+
+        when(budgetChangeRepository.findById(changeId))
+                .thenReturn(Optional.empty());
+
+        // when
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.updateBudgetChange(roomId, userId, changeId, updateRequest)
+                () -> budgetChangeService.updateBudgetChange(
+                        roomId, userId, changeId, updateRequest
+                )
         );
 
-        assertEquals(ErrorCode.BUDGET_CHANGE_NOT_FOUND, exception.getErrorCode());
-        verify(budgetService, never()).findByRoomIdWithLock(any());
+        // then
+        assertEquals(
+                ErrorCode.BUDGET_CHANGE_NOT_FOUND,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "해당 정산내역이 존재하지 않습니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
     }
 
     @Test
-    @DisplayName("정산 수정 실패 - 유효하지 않은 방의 정산건인 경우")
+    @DisplayName("정산 수정 실패 - 정산 유형이 아닌 내역을 수정할 때")
+    void updateBudgetChange_notSettlementType() {
+
+        // given
+        Long roomId = 1L;
+        Long userId = 100L;
+        Long targetUserId = 200L;
+        Long changeId = 10L;
+
+        BudgetChangeUpdateRequest updateRequest =
+                new BudgetChangeUpdateRequest(
+                        6000L,
+                        4000L,
+                        "홍길동",
+                        "test@test.com",
+                        "수정 사유"
+                );
+
+        User user = mock(User.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection =
+                mock(UserRoomConnection.class);
+        BudgetChange budgetChange =
+                mock(BudgetChange.class);
+
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
+
+        when(connection.getAuthority())
+                .thenReturn(Authority.OWNER);
+
+        when(userRepository.findByNameAndEmail(
+                "홍길동", "test@test.com"
+        )).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(targetUserId);
+
+        when(budgetService.validateRoomMember(roomId, targetUserId))
+                .thenReturn(targetConnection);
+
+        when(budgetChangeRepository.findById(changeId))
+                .thenReturn(Optional.of(budgetChange));
+
+        when(budgetChange.getType())
+                .thenReturn(BudgetType.INCREASE);
+
+        // when
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> budgetChangeService.updateBudgetChange(
+                        roomId, userId, changeId, updateRequest
+                )
+        );
+
+        // then
+        assertEquals(
+                ErrorCode.BAD_REQUEST,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "정산(SETTLEMENT) 타입의 내역만 수정할 수 있습니다.",
+                exception.getMessage()
+        );
+
+        // 정산 유형이 아니라면 예산 락 획득과 수정이 진행되지 않아야 함
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
+
+        verify(budgetChange, never())
+                .updateChange(any(), any());
+    }
+
+    @Test
+    @DisplayName("정산 수정 실패 - 유효하지 않은 모임의 정산 내역인 경우")
     void updateBudgetChange_invalidRoomId() {
+
         // given
         Long roomId = 1L;
         Long otherRoomId = 2L;
         Long userId = 100L;
+        Long targetUserId = 200L;
         Long changeId = 10L;
-        BudgetChangeUpdateRequest updateRequest = new BudgetChangeUpdateRequest(
-                6000L, 4000L, "홍길동", "test@test.com", "수정 사유"
-        );
+
+        BudgetChangeUpdateRequest updateRequest =
+                new BudgetChangeUpdateRequest(
+                        6000L,
+                        4000L,
+                        "홍길동",
+                        "test@test.com",
+                        "수정 사유"
+                );
 
         User user = mock(User.class);
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        UserRoomConnection targetConnection = mock(UserRoomConnection.class);
-        BudgetChange budgetChange = mock(BudgetChange.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection =
+                mock(UserRoomConnection.class);
+        BudgetChange budgetChange =
+                mock(BudgetChange.class);
         Room otherRoom = mock(Room.class);
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(connection.getAuthority()).thenReturn(Authority.OWNER);
-        when(userRepository.findByNameAndEmail(any(), any())).thenReturn(Optional.of(user));
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
 
-        // 대상 유저 멤버 검증 모킹 추가
-        when(budgetService.validateRoomMember(roomId, user.getId())).thenReturn(targetConnection);
+        when(connection.getAuthority())
+                .thenReturn(Authority.OWNER);
 
-        when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.of(budgetChange));
+        when(userRepository.findByNameAndEmail(anyString(), anyString()))
+                .thenReturn(Optional.of(user));
 
-        // 정산 타입 검증 모킹 추가
-        when(budgetChange.getType()).thenReturn(BudgetType.SETTLEMENT);
+        when(user.getId()).thenReturn(targetUserId);
+
+        when(budgetService.validateRoomMember(roomId, targetUserId))
+                .thenReturn(targetConnection);
+
+        when(budgetChangeRepository.findById(changeId))
+                .thenReturn(Optional.of(budgetChange));
+
+        when(budgetChange.getType())
+                .thenReturn(BudgetType.SETTLEMENT);
 
         when(budgetChange.getRoom()).thenReturn(otherRoom);
-        when(otherRoom.getId()).thenReturn(otherRoomId); // 다른 방 ID
+        when(otherRoom.getId()).thenReturn(otherRoomId);
 
-        // when & then
+        // when
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.updateBudgetChange(roomId, userId, changeId, updateRequest)
+                () -> budgetChangeService.updateBudgetChange(
+                        roomId, userId, changeId, updateRequest
+                )
         );
 
-        assertEquals(ErrorCode.BAD_REQUEST, exception.getErrorCode());
-        verify(budgetService, never()).findByRoomIdWithLock(any());
+        // then
+        assertEquals(
+                ErrorCode.BAD_REQUEST,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "유효한 정산내역이 아닙니다.",
+                exception.getMessage()
+        );
+
+        verify(budgetService, never())
+                .findByRoomIdWithLock(any());
     }
 
     @Test
-    @DisplayName("정산 수정 실패 - 신청 금액 증액분이 현재 가용 예산을 초과할 때")
+    @DisplayName("정산 수정 실패 - 신청 금액 증액분이 가용예산을 초과할 때")
     void updateBudgetChange_requestAmountOverBudget() {
+
         // given
         Long roomId = 1L;
         Long userId = 100L;
+        Long targetUserId = 200L;
         Long changeId = 10L;
 
-        // 기존 신청금액 5000원 -> 수정 요청: 8000원 (3000원 더 신청)
-        BudgetChangeUpdateRequest updateRequest = new BudgetChangeUpdateRequest(
-                8000L, 4000L, "홍길동", "test@test.com", "수정 사유"
-        );
+        // 기존 신청 금액 5,000원에서 8,000원으로 변경
+        // 증액분은 3,000원
+        BudgetChangeUpdateRequest updateRequest =
+                new BudgetChangeUpdateRequest(
+                        8000L,
+                        4000L,
+                        "홍길동",
+                        "test@test.com",
+                        "수정 사유"
+                );
 
         User user = mock(User.class);
-        UserRoomConnection connection = mock(UserRoomConnection.class);
-        UserRoomConnection targetConnection = mock(UserRoomConnection.class); // 대상 유저 멤버 검증용
-        BudgetChange budgetChange = mock(BudgetChange.class);
+        UserRoomConnection connection =
+                mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection =
+                mock(UserRoomConnection.class);
+        BudgetChange budgetChange =
+                mock(BudgetChange.class);
         Room room = mock(Room.class);
 
-        when(budgetService.validateRoomMember(roomId, userId)).thenReturn(connection);
-        when(connection.getAuthority()).thenReturn(Authority.OWNER);
-        when(userRepository.findByNameAndEmail(any(), any())).thenReturn(Optional.of(user));
+        when(budgetService.validateRoomMember(roomId, userId))
+                .thenReturn(connection);
 
-        // 새로 추가된 대상 유저의 방 멤버 검증 모킹
-        when(budgetService.validateRoomMember(roomId, user.getId())).thenReturn(targetConnection);
+        when(connection.getAuthority())
+                .thenReturn(Authority.OWNER);
 
-        when(budgetChangeRepository.findById(changeId)).thenReturn(Optional.of(budgetChange));
+        when(userRepository.findByNameAndEmail(anyString(), anyString()))
+                .thenReturn(Optional.of(user));
 
-        // 새로 추가된 정산 타입 검증 모킹 (SETTLEMENT 리턴)
-        when(budgetChange.getType()).thenReturn(BudgetType.SETTLEMENT);
+        when(user.getId()).thenReturn(targetUserId);
+
+        when(budgetService.validateRoomMember(roomId, targetUserId))
+                .thenReturn(targetConnection);
+
+        when(budgetChangeRepository.findById(changeId))
+                .thenReturn(Optional.of(budgetChange));
+
+        when(budgetChange.getType())
+                .thenReturn(BudgetType.SETTLEMENT);
 
         when(budgetChange.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
 
-        // 락 조회
-        when(budgetService.findByRoomIdWithLock(roomId)).thenReturn(room);
+        when(budgetService.findByRoomIdWithLock(roomId))
+                .thenReturn(room);
 
         when(budgetChange.getChangeBudget()).thenReturn(5000L);
-        // 가용예산은 1000원만 남아있어 3000원 증액 불가능!
+
+        // 가용예산 1,000원으로 증액분 3,000원을 감당할 수 없음
         when(room.getAvailableBudget()).thenReturn(1000L);
 
-        // when & then
+        // when
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> budgetChangeService.updateBudgetChange(roomId, userId, changeId, updateRequest)
+                () -> budgetChangeService.updateBudgetChange(
+                        roomId, userId, changeId, updateRequest
+                )
         );
 
-        assertEquals(ErrorCode.REQUEST_AMOUNT_OVER_BUDGET, exception.getErrorCode());
+        // then
+        assertEquals(
+                ErrorCode.REQUEST_AMOUNT_OVER_BUDGET,
+                exception.getErrorCode()
+        );
+        assertEquals(
+                "신청예산이 가용예산을 초과했습니다.",
+                exception.getMessage()
+        );
 
-        // 예산 초과로 인해서 뒤쪽 예산 업데이트 및 엔티티 수정이 실행되지 않았는지 검증
-        verify(room, never()).updateTotalBudget(any());
-        verify(budgetChange, never()).updateChange(any(), any());
+        // 예산 초과 시 후속 예산 변경과 정산 수정은 실행되지 않아야 함
+        verify(room, never())
+                .updateTotalBudget(any());
+
+        verify(budgetChange, never())
+                .updateChange(any(), any());
     }
 }
