@@ -26,6 +26,8 @@ import com.budzet.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -192,9 +194,10 @@ class RoomServiceTest {
         assertThat(response.currency()).isEqualTo("KRW");
     }
 
-    @Test
-    @DisplayName("모임원이 모임 이름을 수정하면, 에러 발생")
-    void updateRoom_throwsForbiddenExceptionWhenUserIsNotOwner() {
+    @ParameterizedTest(name = "{0} 권한은 모임 이름을 수정할 수 없다")
+    @EnumSource(value = Authority.class, names = {"MEMBER", "OPERATOR"})
+    @DisplayName("모임장이 아닌 사용자는 모임 이름을 수정할 수 없다.")
+    void updateRoom_throwsForbiddenExceptionWhenUserIsNotOwner(Authority authority) {
         Long userId = 1L;
         Long roomId = 10L;
         Room room = Room.create("기존 이름", 100_000L, Currency.KRW);
@@ -203,7 +206,7 @@ class RoomServiceTest {
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
                 .thenReturn(Optional.of(connection));
-        when(connection.getAuthority()).thenReturn(Authority.MEMBER);
+        when(connection.getAuthority()).thenReturn(authority);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -318,9 +321,10 @@ class RoomServiceTest {
         verify(roomRepository, never()).delete(any(Room.class));
     }
 
-    @Test
-    @DisplayName("모임원은 모임을 삭제할 수 없다.")
-    void deleteRoom_throwsForbiddenExceptionWhenUserIsNotOwner() {
+    @ParameterizedTest(name = "{0} 권한은 모임을 삭제할 수 없다")
+    @EnumSource(value = Authority.class, names = {"MEMBER", "OPERATOR"})
+    @DisplayName("모임장이 아닌 사용자는 모임을 삭제할 수 없다.")
+    void deleteRoom_throwsForbiddenExceptionWhenUserIsNotOwner(Authority authority) {
         Long userId = 1L;
         Long roomId = 10L;
         Room room = Room.create("사진동아리", 100_000L, Currency.KRW);
@@ -329,7 +333,7 @@ class RoomServiceTest {
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
                 .thenReturn(Optional.of(connection));
-        when(connection.getAuthority()).thenReturn(Authority.MEMBER);
+        when(connection.getAuthority()).thenReturn(authority);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
