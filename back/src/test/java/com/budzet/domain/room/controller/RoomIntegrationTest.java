@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.budzet.domain.room.dto.RoomCreateRequest;
 import com.budzet.domain.room.dto.RoomUpdateRequest;
+import com.budzet.domain.room.dto.AuthorityChangeRequest;
 import com.budzet.domain.budget.entity.BudgetChange;
 import com.budzet.domain.budget.entity.BudgetRequest;
 import com.budzet.domain.budget.entity.BudgetType;
@@ -386,6 +387,200 @@ class RoomIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new RoomUpdateRequest("수정된 이름")))
                 : delete("/rooms/{roomId}", roomId);
+    }
+
+    @Test
+    @DisplayName("OWNER의 운영자 지정·해제는 요청 종료 후에도 DB에 반영된다.")
+    void changeAuthority_persistsPromotionAndDemotion() throws Exception {
+        User owner = createUser();
+        Room room = createRoom(owner, "권한 변경 모임", 100_000L, Currency.KRW);
+        User target = createMember(room, Authority.MEMBER);
+        Cookie ownerCookie = login(owner);
+
+        for (Authority authority : List.of(Authority.OPERATOR, Authority.MEMBER)) {
+            mockMvc.perform(authorityRequest(room.getId(), target.getId(), authority)
+                            .cookie(ownerCookie))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.resultCode").value(200))
+                    .andExpect(jsonPath("$.message").value("멤버 권한이 변경되었습니다."))
+                    .andExpect(jsonPath("$.data").isEmpty());
+
+            assertAuthority(room, target, authority);
+            assertAuthority(room, owner, Authority.OWNER);
+            assertThat(connectionRepository.findAllByRoom_Id(room.getId())).hasSize(2);
+        }
+    }
+
+    @ParameterizedTest(name = "{0}에게 모임장 위임")
+    @EnumSource(value = Authority.class, names = {"MEMBER", "OPERATOR"})
+    @DisplayName("위임은 두 사람의 권한을 저장하고 기존 로그인 상태에서도 관리 권한을 바꾼다.")
+    void delegateOwner_persistsRolesAndTransfersManagementAccess(Authority targetAuthority) throws Exception {
+        User owner = createUser();
+        Room room = createRoom(owner, "위임할 모임", 100_000L, Currency.KRW);
+        User target = createMember(room, targetAuthority);
+        // 위임 전에 발급한 쿠키로 변경된 권한이 적용되는지 확인한다.
+        Cookie ownerCookie = login(owner);
+        Cookie targetCookie = login(target);
+
+        mockMvc.perform(patch("/rooms/{roomId}/members/{userId}/owner", room.getId(), target.getId())
+                        .cookie(ownerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value(200))
+                .andExpect(jsonPath("$.message").value("모임장 권한이 위임되었습니다."))
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        assertAuthority(room, owner, Authority.MEMBER);
+        assertAuthority(room, target, Authority.OWNER);
+        assertThat(connectionRepository.findAllByRoom_Id(room.getId())).hasSize(2);
+
+        mockMvc.perform(mutationRequest("수정", room.getId()).cookie(ownerCookie))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("권한이 없습니다."));
+        assertThat(roomRepository.findById(room.getId()).orElseThrow().getName()).isEqualTo("위임할 모임");
+
+        mockMvc.perform(mutationRequest("수정", room.getId()).cookie(targetCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("수정된 이름"));
+        assertThat(roomRepository.findById(room.getId()).orElseThrow().getName()).isEqualTo("수정된 이름");
+        assertAuthority(room, owner, Authority.MEMBER);
+        assertAuthority(room, target, Authority.OWNER);
+    }
+
+    @ParameterizedTest(name = "{0} 요청: {1}")
+    @MethodSource("forbiddenAuthorityRequests")
+    @DisplayName("권한 부족·미참여·미인증 상태의 권한 변경·위임은 기존 연결과 권한을 보존한다.")
+    void changeRoles_rejectsUnauthorizedActorsAndPreservesConnections(
+            String operation, String actorType, int expectedStatus, String message
+    ) throws Exception {
+        User owner = createUser();
+        Room room = createRoom(owner, "권한 보호 모임", 100_000L, Currency.KRW);
+        User target = createMember(room, Authority.MEMBER);
+        MockHttpServletRequestBuilder request = roleRequest(operation, room.getId(), target.getId());
+
+        if (!actorType.equals("미인증")) {
+            User actor = actorType.equals("미참여")
+                    ? createUser() : createMember(room, Authority.valueOf(actorType));
+            request.cookie(login(actor));
+        }
+        List<ConnectionState> before = connectionStates(room);
+
+        mockMvc.perform(request)
+                .andExpect(status().is(expectedStatus))
+                .andExpect(jsonPath("$.message").value(message));
+
+        assertThat(connectionStates(room)).containsExactlyInAnyOrderElementsOf(before);
+    }
+
+    private static Stream<Arguments> forbiddenAuthorityRequests() {
+        return Stream.of("권한 변경", "위임").flatMap(operation -> Stream.of(
+                Arguments.of(operation, "MEMBER", 403, "권한이 없습니다."),
+                Arguments.of(operation, "OPERATOR", 403, "권한이 없습니다."),
+                Arguments.of(operation, "미참여", 404, "멤버를 찾을 수 없습니다."),
+                Arguments.of(operation, "미인증", 401, "로그인 후 이용해주세요.")
+        ));
+    }
+
+    @ParameterizedTest(name = "{0} 요청: 대상 {1}")
+    @MethodSource("nonMemberTargets")
+    @DisplayName("해당 모임의 멤버가 아닌 대상의 권한 변경·위임은 거부하고 다른 모임의 권한도 보존한다.")
+    void changeRoles_rejectsNonMemberTargetAndPreservesBothRooms(String operation, boolean inOtherRoom)
+            throws Exception {
+        User owner = createUser();
+        Room room = createRoom(owner, "요청 대상 모임", 100_000L, Currency.KRW);
+        createMember(room, Authority.OPERATOR);
+        Room otherRoom = createRoom(owner, "다른 모임", 50_000L, Currency.USD);
+        User target = inOtherRoom ? createMember(otherRoom, Authority.MEMBER) : createUser();
+        List<ConnectionState> before = connectionStates(room);
+        List<ConnectionState> otherBefore = connectionStates(otherRoom);
+
+        mockMvc.perform(roleRequest(operation, room.getId(), target.getId()).cookie(login(owner)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.resultCode").value(404))
+                .andExpect(jsonPath("$.message").value("멤버를 찾을 수 없습니다."));
+
+        assertThat(connectionStates(room)).containsExactlyInAnyOrderElementsOf(before);
+        assertThat(connectionStates(otherRoom)).containsExactlyInAnyOrderElementsOf(otherBefore);
+    }
+
+    private static Stream<Arguments> nonMemberTargets() {
+        return Stream.of("권한 변경", "위임").flatMap(operation -> Stream.of(
+                Arguments.of(operation, false),
+                Arguments.of(operation, true)
+        ));
+    }
+
+    @ParameterizedTest(name = "OWNER 자신을 대상으로 {0}")
+    @ValueSource(strings = {"권한 변경", "위임"})
+    @DisplayName("OWNER 자신의 권한 변경과 자기 위임은 거부하고 기존 권한을 보존한다.")
+    void changeRoles_rejectsOwnerAsTargetAndPreservesConnections(String operation) throws Exception {
+        User owner = createUser();
+        Room room = createRoom(owner, "모임장 보호 모임", 100_000L, Currency.KRW);
+        createMember(room, Authority.OPERATOR);
+        List<ConnectionState> before = connectionStates(room);
+
+        mockMvc.perform(roleRequest(operation, room.getId(), owner.getId()).cookie(login(owner)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.resultCode").value(403))
+                .andExpect(jsonPath("$.message").value("권한이 없습니다."));
+
+        assertThat(connectionStates(room)).containsExactlyInAnyOrderElementsOf(before);
+    }
+
+    @Test
+    @DisplayName("권한 변경 API로 OWNER를 직접 부여할 수 없으며 기존 권한은 보존된다.")
+    void changeAuthority_rejectsDirectOwnerGrantAndPreservesConnections() throws Exception {
+        User owner = createUser();
+        Room room = createRoom(owner, "직접 부여 방지 모임", 100_000L, Currency.KRW);
+        User target = createMember(room, Authority.MEMBER);
+        List<ConnectionState> before = connectionStates(room);
+
+        mockMvc.perform(authorityRequest(room.getId(), target.getId(), Authority.OWNER).cookie(login(owner)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.resultCode").value(400))
+                .andExpect(jsonPath("$.message").value("변경할 수 없는 권한입니다."));
+
+        assertThat(connectionStates(room)).containsExactlyInAnyOrderElementsOf(before);
+    }
+
+    private MockHttpServletRequestBuilder roleRequest(String operation, Long roomId, Long targetId)
+            throws Exception {
+        return operation.equals("권한 변경")
+                ? authorityRequest(roomId, targetId, Authority.OPERATOR)
+                : patch("/rooms/{roomId}/members/{userId}/owner", roomId, targetId);
+    }
+
+    private List<ConnectionState> connectionStates(Room room) {
+        return connectionRepository.findAllByRoom_Id(room.getId()).stream()
+                .map(connection -> new ConnectionState(
+                        connection.getUser().getId(), connection.getAuthority(),
+                        connection.isJoined(), connection.getCreatedAt()))
+                .toList();
+    }
+
+    private record ConnectionState(Long userId, Authority authority, boolean joined, LocalDateTime createdAt) {
+    }
+
+    private MockHttpServletRequestBuilder authorityRequest(
+            Long roomId, Long targetId, Authority authority
+    ) throws Exception {
+        return patch("/rooms/{roomId}/members/{userId}/authority", roomId, targetId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new AuthorityChangeRequest(authority)));
+    }
+
+    private User createMember(Room room, Authority authority) {
+        User user = createUser();
+        UserRoomConnection connection = UserRoomConnection.createMember(user, room);
+        connection.changeAuthority(authority);
+        connectionRepository.save(connection);
+        return user;
+    }
+
+    private void assertAuthority(Room room, User user, Authority expected) {
+        UserRoomConnection saved = connectionRepository
+                .findByUser_IdAndRoom_Id(user.getId(), room.getId()).orElseThrow();
+        assertThat(saved.getAuthority()).isEqualTo(expected);
+        assertThat(saved.isJoined()).isTrue();
     }
 
     private RelatedData createRelatedData(Room room) {
