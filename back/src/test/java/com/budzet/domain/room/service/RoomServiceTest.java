@@ -13,6 +13,7 @@ import com.budzet.domain.room.dto.RoomCreateResponse;
 import com.budzet.domain.room.dto.RoomDetailResponse;
 import com.budzet.domain.room.dto.RoomListResponse;
 import com.budzet.domain.room.dto.RoomUpdateRequest;
+import com.budzet.domain.room.dto.AuthorityChangeRequest;
 import com.budzet.domain.room.entity.Authority;
 import com.budzet.domain.room.entity.Currency;
 import com.budzet.domain.room.entity.Room;
@@ -344,9 +345,144 @@ class RoomServiceTest {
         verify(roomRepository, never()).delete(any(Room.class));
     }
 
+    @ParameterizedTest(name = "{0} 권한을 부여한다")
+    @EnumSource(value = Authority.class, names = {"MEMBER", "OPERATOR"})
+    @DisplayName("모임장은 MEMBER를 OPERATOR로 지정하거나 OPERATOR를 MEMBER로 해제할 수 있다.")
+    void changeAuthority_changesTargetAuthority(Authority requestedAuthority) {
+        Long actorId = 1L;
+        Long roomId = 10L;
+        Long targetUserId = 2L;
+        UserRoomConnection actorConnection = mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection = mock(UserRoomConnection.class);
+        Authority previousAuthority = requestedAuthority == Authority.OPERATOR
+                ? Authority.MEMBER : Authority.OPERATOR;
+
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
+                .thenReturn(Optional.of(actorConnection));
+        when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId))
+                .thenReturn(Optional.of(targetConnection));
+        when(targetConnection.getAuthority()).thenReturn(previousAuthority);
+
+        roomService.changeAuthority(actorId, roomId, targetUserId,
+                new AuthorityChangeRequest(requestedAuthority));
+
+        verify(targetConnection).changeAuthority(requestedAuthority);
+        verify(actorConnection, never()).changeAuthority(any(Authority.class));
+    }
+
+    @ParameterizedTest(name = "{0} 권한은 다른 멤버의 권한을 변경할 수 없다")
+    @EnumSource(value = Authority.class, names = {"MEMBER", "OPERATOR"})
+    @DisplayName("모임장이 아닌 사용자의 권한 변경 요청은 거부한다.")
+    void changeAuthority_rejectsNonOwner(Authority authority) {
+        Long actorId = 1L;
+        Long roomId = 10L;
+        Long targetUserId = 2L;
+        UserRoomConnection actorConnection = mock(UserRoomConnection.class);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
+                .thenReturn(Optional.of(actorConnection));
+        when(actorConnection.getAuthority()).thenReturn(authority);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> roomService.changeAuthority(actorId, roomId, targetUserId,
+                        new AuthorityChangeRequest(Authority.OPERATOR)));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.OWNER_REQUIRED);
+        verify(actorConnection, never()).changeAuthority(any(Authority.class));
+        verify(userRoomConnectionRepository, never()).findByUser_IdAndRoom_Id(targetUserId, roomId);
+    }
+
     @Test
+    @DisplayName("모임에 참여하지 않은 사용자의 권한 변경 요청은 거부한다.")
+    void changeAuthority_rejectsActorWithoutRoomConnection() {
+        Long actorId = 1L;
+        Long roomId = 10L;
+        Long targetUserId = 2L;
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> roomService.changeAuthority(actorId, roomId, targetUserId,
+                        new AuthorityChangeRequest(Authority.OPERATOR)));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+        verify(userRoomConnectionRepository, never()).findByUser_IdAndRoom_Id(targetUserId, roomId);
+    }
+
+    @Test
+    @DisplayName("권한 변경 대상이 모임에 참여하지 않았으면 거부한다.")
+    void changeAuthority_rejectsTargetWithoutRoomConnection() {
+        Long actorId = 1L;
+        Long roomId = 10L;
+        Long targetUserId = 2L;
+        UserRoomConnection actorConnection = mock(UserRoomConnection.class);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
+                .thenReturn(Optional.of(actorConnection));
+        when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> roomService.changeAuthority(actorId, roomId, targetUserId,
+                        new AuthorityChangeRequest(Authority.OPERATOR)));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+        verify(actorConnection, never()).changeAuthority(any(Authority.class));
+    }
+
+    @Test
+    @DisplayName("일반 권한 변경으로 기존 OWNER의 권한을 변경할 수 없다.")
+    void changeAuthority_rejectsOwnerTarget() {
+        Long actorId = 1L;
+        Long roomId = 10L;
+        Long targetUserId = 2L;
+        UserRoomConnection actorConnection = mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection = mock(UserRoomConnection.class);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
+                .thenReturn(Optional.of(actorConnection));
+        when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId))
+                .thenReturn(Optional.of(targetConnection));
+        when(targetConnection.getAuthority()).thenReturn(Authority.OWNER);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> roomService.changeAuthority(actorId, roomId, targetUserId,
+                        new AuthorityChangeRequest(Authority.MEMBER)));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.OWNER_REQUIRED);
+        verify(actorConnection, never()).changeAuthority(any(Authority.class));
+        verify(targetConnection, never()).changeAuthority(any(Authority.class));
+    }
+
+    @ParameterizedTest(name = "{0}에게 OWNER 부여 거부")
+    @EnumSource(value = Authority.class, names = {"MEMBER", "OPERATOR"})
+    @DisplayName("일반 권한 변경으로 OWNER를 부여할 수 없다.")
+    void changeAuthority_rejectsGrantingOwner(Authority targetAuthority) {
+        Long actorId = 1L;
+        Long roomId = 10L;
+        Long targetUserId = 2L;
+        UserRoomConnection actorConnection = mock(UserRoomConnection.class);
+        UserRoomConnection targetConnection = mock(UserRoomConnection.class);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
+                .thenReturn(Optional.of(actorConnection));
+        when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId))
+                .thenReturn(Optional.of(targetConnection));
+        when(targetConnection.getAuthority()).thenReturn(targetAuthority);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> roomService.changeAuthority(actorId, roomId, targetUserId,
+                        new AuthorityChangeRequest(Authority.OWNER)));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_AUTHORITY);
+        verify(actorConnection, never()).changeAuthority(any(Authority.class));
+        verify(targetConnection, never()).changeAuthority(any(Authority.class));
+    }
+
+    @ParameterizedTest(name = "{0}에게 모임장 위임")
+    @EnumSource(value = Authority.class, names = {"MEMBER", "OPERATOR"})
     @DisplayName("모임장은 다른 모임원에게 모임장 권한을 위임할 수 있다.")
-    void delegateOwner_changesOwnerToMemberAndTargetToOwner() {
+    void delegateOwner_changesOwnerToMemberAndTargetToOwner(Authority targetAuthority) {
         Long actorId = 1L;
         Long roomId = 10L;
         Long targetUserId = 2L;
@@ -364,7 +500,7 @@ class RoomServiceTest {
                 targetUserId, roomId
         )).thenReturn(Optional.of(targetConnection));
 
-        when(targetConnection.getAuthority()).thenReturn(Authority.MEMBER);
+        when(targetConnection.getAuthority()).thenReturn(targetAuthority);
 
         roomService.delegateOwner(
                 actorId,
@@ -376,9 +512,10 @@ class RoomServiceTest {
         verify(targetConnection).changeAuthority(Authority.OWNER);
     }
 
-    @Test
-    @DisplayName("모임원이 모임장 권한을 위임하려 하면, 에러 발생")
-    void delegateOwner_throwsForbiddenExceptionWhenUserIsNotOwner() {
+    @ParameterizedTest(name = "{0} 권한은 모임장을 위임할 수 없다")
+    @EnumSource(value = Authority.class, names = {"MEMBER", "OPERATOR"})
+    @DisplayName("모임장이 아닌 사용자가 모임장 권한을 위임하려 하면, 에러 발생")
+    void delegateOwner_throwsForbiddenExceptionWhenUserIsNotOwner(Authority authority) {
         Long actorId = 1L;
         Long roomId = 10L;
         Long targetUserId = 2L;
@@ -389,7 +526,7 @@ class RoomServiceTest {
                 actorId, roomId
         )).thenReturn(Optional.of(actorConnection));
 
-        when(actorConnection.getAuthority()).thenReturn(Authority.MEMBER);
+        when(actorConnection.getAuthority()).thenReturn(authority);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -404,8 +541,42 @@ class RoomServiceTest {
                 ErrorCode.OWNER_REQUIRED
         );
 
+        verify(actorConnection, never()).changeAuthority(any(Authority.class));
         verify(userRoomConnectionRepository, never())
                 .findByUser_IdAndRoom_Id(targetUserId, roomId);
+    }
+
+    @Test
+    @DisplayName("모임에 참여하지 않은 사용자의 모임장 위임 요청은 거부한다.")
+    void delegateOwner_rejectsActorWithoutRoomConnection() {
+        Long actorId = 1L;
+        Long roomId = 10L;
+        Long targetUserId = 2L;
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> roomService.delegateOwner(actorId, roomId, targetUserId));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+        verify(userRoomConnectionRepository, never()).findByUser_IdAndRoom_Id(targetUserId, roomId);
+    }
+
+    @Test
+    @DisplayName("모임장은 자기 자신에게 모임장 권한을 위임할 수 없다.")
+    void delegateOwner_rejectsSelfDelegation() {
+        Long actorId = 1L;
+        Long roomId = 10L;
+        UserRoomConnection actorConnection = mock(UserRoomConnection.class);
+        when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
+                .thenReturn(Optional.of(actorConnection));
+        when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> roomService.delegateOwner(actorId, roomId, actorId));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.OWNER_REQUIRED);
+        verify(actorConnection, never()).changeAuthority(any(Authority.class));
     }
 
     @Test
