@@ -41,6 +41,9 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok'
     implementation 'org.springframework.retry:spring-retry:2.0.12'
     implementation 'org.springframework:spring-aspects:6.2.12'
+    testImplementation platform("org.testcontainers:testcontainers-bom:1.21.4")
+    testImplementation "org.testcontainers:junit-jupiter"
+    testImplementation "org.testcontainers:mysql"
 }
 
 tasks.named('test') {
