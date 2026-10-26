@@ -56,7 +56,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class BudgetConcurrencyIntegrationTest {
 
     /*
-     * 이 테스트 클래스 전용 MySQL 컨테이너입니다.
+     * 이 동시성 테스트 클래스 전용 MySQL 컨테이너입니다.
      * application-test.yml의 H2 설정은 수정하지 않습니다.
      */
     @Container
