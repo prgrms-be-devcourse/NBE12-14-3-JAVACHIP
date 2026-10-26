@@ -61,7 +61,7 @@ class BudgetConcurrencyIntegrationTest {
      */
     @Container
     static final MySQLContainer<?> MYSQL =
-            new MySQLContainer<>("mysql:8.0")
+            new MySQLContainer<>("mysql:8.4")
                     .withDatabaseName("budzet_concurrency_test")
                     .withUsername("budzet_test")
                     .withPassword("budzet_test");
