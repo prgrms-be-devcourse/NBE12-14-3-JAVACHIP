@@ -1,12 +1,19 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
 import AuthFrame from "../components/common/AuthFrame";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signup } from "../lib/api/userApi";
+import { getNextPath } from "../lib/authNavigation";
 
 export default function SignupPage() {
+  return <Suspense fallback={null}><SignupForm /></Suspense>;
+}
+
+function SignupForm() {
+  const searchParams = useSearchParams();
+  const nextPath = getNextPath(searchParams.get("next"));
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -23,7 +30,7 @@ export default function SignupPage() {
 
     try {
       await signup({ email, password, name });
-      router.replace("/login?registered=1");
+      router.replace("/login?" + new URLSearchParams({ registered: "1", next: nextPath }).toString());
     } catch (caughtError) {
       console.error(caughtError);
       setError(
@@ -130,7 +137,7 @@ export default function SignupPage() {
             </span>
 
             <Link
-              href="/login"
+              href={{ pathname: "/login", query: { next: nextPath } }}
               className="ml-2 text-sm font-semibold text-zinc-900 hover:underline"
             >
               로그인

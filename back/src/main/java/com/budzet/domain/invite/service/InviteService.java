@@ -37,15 +37,15 @@ public class InviteService {
     public InviteResponse createInvite(Long roomId, Long userId) {
 
         Room room = roomRepository.findById(roomId)
-                .orElseThrow();
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         UserRoomConnection connection =
                 userRoomConnectionRepository
                         .findByUser_IdAndRoom_Id(userId, roomId)
-                        .orElseThrow();
+                        .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_JOINED_ROOM));
 
         if (connection.getAuthority() != Authority.OWNER) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+            throw new BusinessException(ErrorCode.OWNER_REQUIRED);
         }
 
         String code = UUID.randomUUID()

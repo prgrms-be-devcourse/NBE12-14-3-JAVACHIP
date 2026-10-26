@@ -5,10 +5,8 @@ import Link from "next/link";
 import AuthFrame from "../components/common/AuthFrame";
 import { useRouter, useSearchParams } from "next/navigation";
 import { login } from "../lib/api/userApi";
+import { getNextPath } from "../lib/authNavigation";
 
-function getNextPath(next: string | null) {
-  return next?.startsWith("/") && !next.startsWith("//") ? next : "/rooms";
-}
 
 export default function LoginPage() {
   return (
@@ -21,6 +19,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const nextPath = getNextPath(searchParams.get("next"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +34,7 @@ function LoginForm() {
 
     try {
       await login({ email, password });
-      router.replace(getNextPath(searchParams.get("next")));
+      router.replace(nextPath);
     } catch (caughtError) {
       console.error(caughtError);
       setError(
@@ -124,7 +123,7 @@ function LoginForm() {
             </span>
 
             <Link
-              href="/signup"
+              href={{ pathname: "/signup", query: { next: nextPath } }}
               className="ml-2 text-sm font-semibold text-zinc-900 hover:underline"
             >
               회원가입

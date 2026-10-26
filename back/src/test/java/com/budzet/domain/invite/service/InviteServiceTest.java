@@ -110,7 +110,7 @@ class InviteServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue(
                         "errorCode",
-                        ErrorCode.UNAUTHORIZED
+                        ErrorCode.OWNER_REQUIRED
                 );
 
         verify(inviteRepository, never())
