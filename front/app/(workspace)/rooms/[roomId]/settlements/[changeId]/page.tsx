@@ -18,17 +18,17 @@ import {
     type BudgetChangeDetailResponse,
 } from "@/app/lib/api/budgetChangeApi";
 
-function formatMoney(
-    amount: number,
-    currency: Budget["currency"],
-) {
-    const symbols = {
-        KRW: "₩",
-        USD: "$",
-        JPY: "¥",
-    };
+function formatMoney(amount: number, currency: "KRW" | "USD" | "JPY") {
+    const symbols = { KRW: "원", USD: "$", JPY: "¥" };
 
-    return `${symbols[currency]}${amount.toLocaleString("ko-KR")}`;
+    const locales = { KRW: "ko-KR", USD: "en-US", JPY: "ja-JP" };
+    const locale = locales[currency] || "ko-KR";
+
+    const formattedAmount = amount.toLocaleString(locale);
+
+    return currency === "KRW"
+        ? `${formattedAmount}${symbols[currency]}`
+        : `${symbols[currency]}${formattedAmount}`;
 }
 
 function formatDateTime(

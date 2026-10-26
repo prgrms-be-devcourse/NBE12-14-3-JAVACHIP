@@ -18,17 +18,17 @@ import {
     type BudgetChangeUpdateRequest,
 } from "@/app/lib/api/budgetChangeApi";
 
-function formatMoney(
-    amount: number,
-    currency: Budget["currency"],
-) {
-    const symbols = {
-        KRW: "₩",
-        USD: "$",
-        JPY: "¥",
-    };
+function formatMoney(amount: number, currency: "KRW" | "USD" | "JPY") {
+    const symbols = { KRW: "원", USD: "$", JPY: "¥" };
 
-    return `${symbols[currency]}${amount.toLocaleString("ko-KR")}`;
+    const locales = { KRW: "ko-KR", USD: "en-US", JPY: "ja-JP" };
+    const locale = locales[currency] || "ko-KR";
+
+    const formattedAmount = amount.toLocaleString(locale);
+
+    return currency === "KRW"
+        ? `${formattedAmount}${symbols[currency]}`
+        : `${symbols[currency]}${formattedAmount}`;
 }
 
 function formatDateTime(
@@ -544,15 +544,11 @@ export default function SettlementEditPage() {
                                                 </div>
 
                                                 <div className="mt-1.5 flex items-center gap-1">
-                                                    <span className="text-base font-extrabold text-indigo-700">
-                                                        {currency ===
-                                                        "KRW"
-                                                            ? "₩"
-                                                            : currency ===
-                                                            "USD"
-                                                                ? "$"
-                                                                : "¥"}
-                                                    </span>
+                                                    {currency !== "KRW" && (
+                                                        <span className="text-base font-extrabold text-indigo-700">
+                                                            {currency === "USD" ? "$" : "¥"}
+                                                        </span>
+                                                    )}
 
                                                     <input
                                                         id="changeBudget"
@@ -573,6 +569,11 @@ export default function SettlementEditPage() {
                                                         }
                                                         className="min-w-0 flex-1 bg-transparent text-lg font-extrabold text-indigo-700 outline-none"
                                                     />
+                                                    {currency === "KRW" && (
+                                                        <span className="text-base font-extrabold text-indigo-700">
+                                                            원
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -592,15 +593,11 @@ export default function SettlementEditPage() {
                                                 </div>
 
                                                 <div className="mt-1.5 flex items-center gap-1">
-                                                    <span className="text-base font-extrabold text-indigo-700">
-                                                        {currency ===
-                                                        "KRW"
-                                                            ? "₩"
-                                                            : currency ===
-                                                            "USD"
-                                                                ? "$"
-                                                                : "¥"}
-                                                    </span>
+                                                    {currency !== "KRW" && (
+                                                        <span className="text-base font-extrabold text-indigo-700">
+                                                            {currency === "USD" ? "$" : "¥"}
+                                                        </span>
+                                                        )}
 
                                                     <input
                                                         id="changedBudget"
@@ -621,6 +618,12 @@ export default function SettlementEditPage() {
                                                         }
                                                         className="min-w-0 flex-1 bg-transparent text-lg font-extrabold text-indigo-700 outline-none"
                                                     />
+
+                                                    {currency === "KRW" && (
+                                                        <span className="text-base font-extrabold text-indigo-700">
+                                                            원
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
 

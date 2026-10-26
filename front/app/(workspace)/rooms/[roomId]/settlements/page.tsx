@@ -31,17 +31,17 @@ const settlementSteps = [
     "정산 내역은 모든 멤버가 볼 수 있어요",
 ];
 
-function formatMoney(
-    amount: number,
-    currency: Budget["currency"],
-) {
-    const symbols = {
-        KRW: "₩",
-        USD: "$",
-        JPY: "¥",
-    };
+function formatMoney(amount: number, currency: "KRW" | "USD" | "JPY") {
+    const symbols = { KRW: "원", USD: "$", JPY: "¥" };
 
-    return `${symbols[currency]}${amount.toLocaleString("ko-KR")}`;
+    const locales = { KRW: "ko-KR", USD: "en-US", JPY: "ja-JP" };
+    const locale = locales[currency] || "ko-KR";
+
+    const formattedAmount = amount.toLocaleString(locale);
+
+    return currency === "KRW"
+        ? `${formattedAmount}${symbols[currency]}`
+        : `${symbols[currency]}${formattedAmount}`;
 }
 
 function getErrorMessage(error: unknown) {

@@ -464,17 +464,17 @@ function StatusBadge({
     );
 }
 
-function formatMoney(
-    value: number,
-    currency: "KRW" | "USD" | "JPY",
-) {
-    const currencyMap = {
-        KRW: "₩",
-        USD: "$",
-        JPY: "¥",
-    };
+function formatMoney(amount: number, currency: "KRW" | "USD" | "JPY") {
+    const symbols = { KRW: "원", USD: "$", JPY: "¥" };
 
-    return `${currencyMap[currency]}${value.toLocaleString("ko-KR")}`;
+    const locales = { KRW: "ko-KR", USD: "en-US", JPY: "ja-JP" };
+    const locale = locales[currency] || "ko-KR";
+
+    const formattedAmount = amount.toLocaleString(locale);
+
+    return currency === "KRW"
+        ? `${formattedAmount}${symbols[currency]}`
+        : `${symbols[currency]}${formattedAmount}`;
 }
 
 function formatDate(value: string) {
