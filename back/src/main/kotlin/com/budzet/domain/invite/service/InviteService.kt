@@ -18,7 +18,7 @@ import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
-import java.util.UUID
+import java.util.*
 
 @Service
 class InviteService(
@@ -76,7 +76,7 @@ class InviteService(
         // 대상 Room을 잠근 상태로 조회
         val roomId = requireNotNull(invite.room.id)
         val room = roomRepository.findByWithLock(roomId)
-            .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
         // 잠금 획득 후 만료일이 유효한지 확인
         if (!invite.expireAt.isAfter(LocalDateTime.now())) {
             throw BusinessException(ErrorCode.INVITE_EXPIRED)

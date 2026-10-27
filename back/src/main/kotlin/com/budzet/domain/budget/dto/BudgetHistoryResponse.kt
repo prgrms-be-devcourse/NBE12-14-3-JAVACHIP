@@ -21,10 +21,16 @@ data class BudgetHistoryResponse(val history: List<HistoryItem>) {
     ) {
         companion object {
             @JvmStatic
-            fun from(budgetChange: BudgetChange): HistoryItem = HistoryItem(
-                budgetChange.id, budgetChange.changeBudget, budgetChange.changedBudget,
-                budgetChange.type.name, budgetChange.userName, budgetChange.reason, budgetChange.createdAt,
-            )
+            fun from(budgetChange: BudgetChange): HistoryItem =
+                HistoryItem(
+                    id = budgetChange.id,
+                    changeBudget = budgetChange.changeBudget,
+                    changedBudget = budgetChange.changedBudget,
+                    type = budgetChange.type.name,
+                    userName = budgetChange.userName,
+                    reason = budgetChange.reason,
+                    processedAt = budgetChange.createdAt,
+                )
         }
     }
 }

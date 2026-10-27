@@ -77,7 +77,7 @@ class BudgetRequestServiceTest {
 
     private void mockRoomWithLock() {
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.of(room));
+                .thenReturn(room);
     }
 
     private void mockAuthority(Authority authority) {

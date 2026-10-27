@@ -13,8 +13,12 @@ data class BudgetChangeUpdateResponse(
     companion object {
         @JvmStatic
         fun from(budgetChange: BudgetChange): BudgetChangeUpdateResponse = BudgetChangeUpdateResponse(
-            budgetChange.id, budgetChange.changeBudget, budgetChange.changedBudget,
-            budgetChange.userName, budgetChange.user.email, budgetChange.reason,
+            id = budgetChange.id,
+            changeBudget = budgetChange.changeBudget,
+            changedBudget = budgetChange.changedBudget,
+            userName = budgetChange.userName,
+            userEmail = budgetChange.user.email,
+            reason = budgetChange.reason,
         )
     }
 }

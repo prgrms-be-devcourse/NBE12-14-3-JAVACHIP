@@ -72,7 +72,7 @@ class BudgetRequestService(
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }
         val room = roomRepository.findByWithLock(roomId)
-            .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
         val request = budgetRequestRepository.findByIdAndRoomId(requestId, roomId)
             .orElseThrow { BusinessException(ErrorCode.BUDGET_REQUEST_NOT_FOUND) }
         if (request.status != BudgetRequestType.REQUEST) {

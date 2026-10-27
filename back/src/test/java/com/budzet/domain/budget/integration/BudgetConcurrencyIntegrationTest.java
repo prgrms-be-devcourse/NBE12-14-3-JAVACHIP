@@ -46,6 +46,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -443,8 +444,10 @@ class BudgetConcurrencyIntegrationTest {
             // 첫 번째 트랜잭션이 Room 행 락을 획득하고 유지합니다.
             lockHolderFuture = executor.submit(() ->
                     transactionTemplate.executeWithoutResult(status -> {
-                        roomRepository.findByWithLock(roomId)
-                                .orElseThrow();
+                        assertNotNull(
+                                roomRepository.findByWithLock(roomId),
+                                "Room을 찾을 수 없습니다. roomId=" + roomId
+                        );
 
                         lockAcquired.countDown();
 

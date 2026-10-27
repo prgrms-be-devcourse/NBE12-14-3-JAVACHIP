@@ -1,7 +1,11 @@
 package com.budzet.domain.budget.service
 
-import com.budzet.domain.budget.dto.*
+import com.budzet.domain.budget.dto.BudgetHistoryResponse
+import com.budzet.domain.budget.dto.BudgetResponse
+import com.budzet.domain.budget.dto.BudgetUpdateRequest
+import com.budzet.domain.budget.dto.BudgetUpdateResponse
 import com.budzet.domain.budget.entity.BudgetChange
+import com.budzet.domain.budget.entity.BudgetType
 import com.budzet.domain.budget.repository.BudgetChangeRepository
 import com.budzet.domain.room.entity.Authority
 import com.budzet.domain.room.entity.Room
@@ -49,14 +53,23 @@ class BudgetService(
     @Transactional
     fun updateBudget(roomId: Long, userId: Long, budgetUpdateRequest: BudgetUpdateRequest): BudgetUpdateResponse {
         val connection = validateRoomMember(roomId, userId)
-        if (connection.authority != Authority.OWNER && connection.authority != Authority.OPERATOR) {
+        if (connection.authority !in setOf(Authority.OWNER, Authority.OPERATOR)) {
             throw BusinessException(ErrorCode.FORBIDDEN_ACCESS)
         }
+        val budgetType = budgetUpdateRequest.budgetType
+            ?: throw BusinessException(ErrorCode.BAD_REQUEST)
+        if (budgetType !in setOf(BudgetType.INCREASE, BudgetType.DECREASE)) {
+            throw BusinessException(ErrorCode.BAD_REQUEST)
+        }
         val room = findByRoomIdWithLock(roomId)
-        room.updateTotalBudget(budgetUpdateRequest.totalBudget, budgetUpdateRequest.budgetType)
+        room.updateTotalBudget(budgetUpdateRequest.totalBudget, budgetType)
         val budgetChange = BudgetChange(
-            room, connection.user, connection.user.name, requireNotNull(budgetUpdateRequest.budgetType),
-            budgetUpdateRequest.reason, budgetUpdateRequest.totalBudget,
+            room = room,
+            user = connection.user,
+            userName = connection.user.name,
+            type = budgetType,
+            reason = budgetUpdateRequest.reason,
+            changeBudget = budgetUpdateRequest.totalBudget,
         )
         room.addBudgetChange(budgetChange)
         budgetChangeRepository.save(budgetChange)
@@ -67,7 +80,7 @@ class BudgetService(
         .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
 
     fun findByRoomIdWithLock(roomId: Long): Room = roomRepository.findByWithLock(roomId)
-        .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+        ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
 
     fun validateRoomMember(roomId: Long, userId: Long): UserRoomConnection =
         userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)

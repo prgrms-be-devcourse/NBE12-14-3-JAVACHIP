@@ -32,7 +32,7 @@ class BudgetController(
     ): ResponseEntity<ApiResponse<BudgetResponse>> {
         val user = rq.getActor()
 
-        val budgetResponse = budgetService.getBudget(roomId, requireNotNull(user.id))
+        val budgetResponse = budgetService.getBudget(roomId, checkNotNull(user.id))
         return ApiResponse.response(
             HttpStatus.OK,
             "예산 조회에 성공하였습니다.",
@@ -49,7 +49,7 @@ class BudgetController(
     ): ResponseEntity<ApiResponse<BudgetHistoryResponse>> {
         val user = rq.getActor()
 
-        val budgetHistoryResponse = budgetService.getBudgetHistory(roomId, requireNotNull(user.id))
+        val budgetHistoryResponse = budgetService.getBudgetHistory(roomId, checkNotNull(user.id))
         return ApiResponse.response(
             HttpStatus.OK,
             "예산 변경 목록 조회에 성공하였습니다.",
@@ -69,7 +69,7 @@ class BudgetController(
         val user = rq.getActor()
 
         val budgetUpdateResponse = budgetService.updateBudget(
-            roomId, requireNotNull(user.id),
+            roomId, checkNotNull(user.id),
             budgetUpdateRequest)
 
         return ApiResponse.response(

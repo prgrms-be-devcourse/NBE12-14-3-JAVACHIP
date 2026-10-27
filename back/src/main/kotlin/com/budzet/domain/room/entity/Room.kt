@@ -62,7 +62,7 @@ open class Room private constructor(name: String, totalBudget: Long, currency: C
         budgetChanges.add(budgetChange)
     }
 
-    fun updateTotalBudget(changedBudget: Long?, type: BudgetType?) {
+    fun updateTotalBudget(changedBudget: Long?, type: BudgetType) {
         if (changedBudget == null || changedBudget <= 0) {
             throw BusinessException(ErrorCode.BAD_REQUEST, "입력된 금액이 올바르지 않습니다.")
         }

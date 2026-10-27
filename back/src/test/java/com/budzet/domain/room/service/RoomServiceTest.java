@@ -1,19 +1,6 @@
 package com.budzet.domain.room.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
-
-import com.budzet.domain.room.dto.RoomCreateRequest;
-import com.budzet.domain.room.dto.RoomCreateResponse;
-import com.budzet.domain.room.dto.RoomDetailResponse;
-import com.budzet.domain.room.dto.RoomListResponse;
-import com.budzet.domain.room.dto.RoomUpdateRequest;
-import com.budzet.domain.room.dto.AuthorityChangeRequest;
+import com.budzet.domain.room.dto.*;
 import com.budzet.domain.room.entity.Authority;
 import com.budzet.domain.room.entity.Currency;
 import com.budzet.domain.room.entity.Room;
@@ -37,7 +24,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
-import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RoomServiceTest {
@@ -136,7 +127,7 @@ class RoomServiceTest {
         Long roomId = 10L;
         Room room = Room.create("사진동아리", 100_000L, Currency.KRW);
         when(roomRepository.findJoinedRoomByIdAndUserId(roomId, userId))
-                .thenReturn(Optional.of(room));
+                .thenReturn(room);
 
         RoomDetailResponse response = roomService.getRoom(userId, roomId);
 
@@ -154,7 +145,7 @@ class RoomServiceTest {
         Long userId = 1L;
         Long roomId = 10L;
         when(roomRepository.findJoinedRoomByIdAndUserId(roomId, userId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,

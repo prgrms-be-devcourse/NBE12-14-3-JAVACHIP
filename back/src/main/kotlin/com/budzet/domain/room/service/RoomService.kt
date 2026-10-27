@@ -43,7 +43,7 @@ class RoomService(
     @Transactional(readOnly = true)
     fun getRoom(userId: Long, roomId: Long): RoomDetailResponse {
         val room = roomRepository.findJoinedRoomByIdAndUserId(roomId, userId)
-            .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+            ?:throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
         return RoomDetailResponse.from(room)
     }
 

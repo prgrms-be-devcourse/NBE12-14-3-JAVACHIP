@@ -16,8 +16,12 @@ data class BudgetResponse(
             val totalBudget = requireNotNull(room.totalBudget)
             val availableBudget = requireNotNull(room.availableBudget)
             return BudgetResponse(
-                requireNotNull(room.id), room.name, totalBudget, availableBudget,
-                totalBudget - availableBudget, room.currency.name,
+                roomId = requireNotNull(room.id),
+                roomName = room.name,
+                totalBudget = totalBudget,
+                availableBudget = availableBudget,
+                reserveBudget = totalBudget - availableBudget,
+                currency = room.currency.name,
             )
         }
     }

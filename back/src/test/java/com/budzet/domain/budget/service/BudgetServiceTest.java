@@ -374,7 +374,7 @@ class BudgetServiceTest {
         when(connection.getUser()).thenReturn(user);
 
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.of(room));
+                .thenReturn(room);
 
         when(room.getId()).thenReturn(roomId);
         when(room.getTotalBudget()).thenReturn(15000L);
@@ -429,7 +429,7 @@ class BudgetServiceTest {
         when(connection.getUser()).thenReturn(user);
 
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.of(room));
+                .thenReturn(room);
 
         when(room.getId()).thenReturn(roomId);
         when(room.getTotalBudget()).thenReturn(8000L);
@@ -520,7 +520,7 @@ class BudgetServiceTest {
                 .thenReturn(Authority.OWNER);
 
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         // when
         BusinessException exception = assertThrows(
@@ -566,7 +566,7 @@ class BudgetServiceTest {
                 .thenReturn(Authority.OWNER);
 
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.of(room));
+                .thenReturn(room);
 
         // 실제 예산 차감 메서드에서 가용예산 부족 예외가 발생하는 상황을 모의
         doThrow(new BusinessException(
