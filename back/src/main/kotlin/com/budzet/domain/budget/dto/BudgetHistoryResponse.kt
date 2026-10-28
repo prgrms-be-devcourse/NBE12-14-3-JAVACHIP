@@ -12,18 +12,23 @@ data class BudgetHistoryResponse(val history: List<HistoryItem>) {
 
     data class HistoryItem(
         val id: Long?,
-        val changeBudget: Long?,
-        val changedBudget: Long?,
+        val changeBudget: Long,
+        val changedBudget: Long,
         val type: String,
-        val userName: String?,
+        val userName: String,
         val reason: String?,
         val processedAt: LocalDateTime?,
     ) {
         companion object {
             @JvmStatic
             fun from(budgetChange: BudgetChange): HistoryItem = HistoryItem(
-                budgetChange.id, budgetChange.changeBudget, budgetChange.changedBudget,
-                budgetChange.type.name, budgetChange.userName, budgetChange.reason, budgetChange.createdAt,
+                id = budgetChange.id,
+                changeBudget = budgetChange.changeBudget,
+                changedBudget = budgetChange.changedBudget,
+                type = budgetChange.type.name,
+                userName = budgetChange.userName,
+                reason = budgetChange.reason,
+                processedAt = budgetChange.createdAt,
             )
         }
     }

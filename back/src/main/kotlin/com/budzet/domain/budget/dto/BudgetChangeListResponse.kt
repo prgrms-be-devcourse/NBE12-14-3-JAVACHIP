@@ -13,18 +13,23 @@ data class BudgetChangeListResponse(val changes: List<ListItem>) {
 
     data class ListItem(
         val id: Long?,
-        val changeBudget: Long?,
-        val changedBudget: Long?,
-        val type: BudgetType?,
-        val userName: String?,
+        val changeBudget: Long,
+        val changedBudget: Long,
+        val type: BudgetType,
+        val userName: String,
         val reason: String?,
         val processedAt: LocalDateTime?,
     ) {
         companion object {
             @JvmStatic
             fun from(budgetChange: BudgetChange): ListItem = ListItem(
-                budgetChange.id, budgetChange.changeBudget, budgetChange.changedBudget, budgetChange.type,
-                budgetChange.userName, budgetChange.reason, budgetChange.createdAt,
+                id = budgetChange.id,
+                changeBudget = budgetChange.changeBudget,
+                changedBudget = budgetChange.changedBudget,
+                type = budgetChange.type,
+                userName = budgetChange.userName,
+                reason = budgetChange.reason,
+                processedAt = budgetChange.createdAt,
             )
         }
     }

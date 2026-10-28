@@ -1,30 +1,40 @@
 package com.budzet.domain.receipt
 
-import com.budzet.domain.budget.entity.*
-import com.budzet.domain.budget.repository.*
-import com.budzet.domain.room.entity.*
-import com.budzet.domain.room.repository.*
+import com.budzet.domain.budget.entity.BudgetRequest
+import com.budzet.domain.budget.entity.BudgetRequestType
+import com.budzet.domain.budget.repository.BudgetChangeRepository
+import com.budzet.domain.budget.repository.BudgetRequestRepository
+import com.budzet.domain.room.entity.Currency
+import com.budzet.domain.room.entity.Room
+import com.budzet.domain.room.entity.UserRoomConnection
+import com.budzet.domain.room.repository.RoomRepository
+import com.budzet.domain.room.repository.UserRoomConnectionRepository
 import com.budzet.domain.user.service.UserService
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.json.JsonMapper
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
-import java.util.UUID
+import java.util.*
 import javax.imageio.ImageIO
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@ActiveProfiles("test")
 class ReceiptEvidenceIntegrationTest {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var users: UserService

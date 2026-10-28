@@ -407,6 +407,18 @@ class BudgetChangeServiceTest {
         BudgetChange settlementChange2 =
                 mock(BudgetChange.class);
 
+        when(settlementChange1.getId()).thenReturn(1L);
+        when(settlementChange1.getChangeBudget()).thenReturn(5_000L);
+        when(settlementChange1.getChangedBudget()).thenReturn(4_500L);
+        when(settlementChange1.getType()).thenReturn(BudgetType.SETTLEMENT);
+        when(settlementChange1.getUserName()).thenReturn("홍길동");
+
+        when(settlementChange2.getId()).thenReturn(2L);
+        when(settlementChange2.getChangeBudget()).thenReturn(8_000L);
+        when(settlementChange2.getChangedBudget()).thenReturn(7_500L);
+        when(settlementChange2.getType()).thenReturn(BudgetType.SETTLEMENT);
+        when(settlementChange2.getUserName()).thenReturn("김철수");
+
         List<BudgetChange> settlementChanges =
                 List.of(settlementChange1, settlementChange2);
 
@@ -549,6 +561,12 @@ class BudgetChangeServiceTest {
 
         when(budgetChange.getUser()).thenReturn(user);
         when(user.getId()).thenReturn(userId);
+        when(user.getEmail()).thenReturn("uesr1@example.com");
+
+        when(budgetChange.getChangeBudget()).thenReturn(9_000L);
+        when(budgetChange.getChangedBudget()).thenReturn(5_500L);
+        when(budgetChange.getType()).thenReturn(BudgetType.SETTLEMENT);
+        when(budgetChange.getUserName()).thenReturn("홍길동");
 
         when(budgetChange.getRequest()).thenReturn(request);
         when(request.getId()).thenReturn(requestId);
@@ -1133,7 +1151,7 @@ class BudgetChangeServiceTest {
                 .findByRoomIdWithLock(anyLong());
 
         verify(budgetChange, never())
-                .updateChange(any(), any());
+                .updateChange(anyString(), anyLong(), anyLong(), any(), any());
     }
 
     @Test
@@ -1294,6 +1312,6 @@ class BudgetChangeServiceTest {
                 .updateTotalBudget(any());
 
         verify(budgetChange, never())
-                .updateChange(any(), any());
+                .updateChange(anyString(), anyLong(), anyLong(), any(), any());
     }
 }

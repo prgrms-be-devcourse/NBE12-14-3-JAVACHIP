@@ -1,6 +1,5 @@
 package com.budzet.domain.budget.entity
 
-import com.budzet.domain.budget.dto.BudgetChangeUpdateRequest
 import com.budzet.domain.room.entity.Room
 import com.budzet.domain.user.entity.User
 import jakarta.persistence.*
@@ -13,11 +12,11 @@ import java.time.LocalDateTime
 open class BudgetChange @JvmOverloads constructor(
     room: Room,
     user: User,
-    userName: String?,
+    userName: String,
     type: BudgetType,
     reason: String?,
-    changeBudget: Long?,
-    changedBudget: Long? = changeBudget,
+    changeBudget: Long,
+    changedBudget: Long = changeBudget,
 ) {
     @field:Id
     @field:GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,17 +24,17 @@ open class BudgetChange @JvmOverloads constructor(
         protected set
 
     @field:ManyToOne(fetch = FetchType.LAZY)
-    @field:JoinColumn(name = "room_id")
+    @field:JoinColumn(name = "room_id", nullable = false)
     open var room: Room = room
         protected set
 
     @field:ManyToOne(fetch = FetchType.LAZY)
-    @field:JoinColumn(name = "user_id")
+    @field:JoinColumn(name = "user_id", nullable = false)
     open var user: User = user
         protected set
 
-    @field:Column(length = 50)
-    open var userName: String? = userName
+    @field:Column(length = 50, nullable = false)
+    open var userName: String = userName
         protected set
 
     @field:Column(nullable = false)
@@ -47,10 +46,12 @@ open class BudgetChange @JvmOverloads constructor(
     open var reason: String? = reason
         protected set
 
-    open var changeBudget: Long? = changeBudget
+    @field:Column(nullable = false)
+    open var changeBudget: Long = changeBudget
         protected set
 
-    open var changedBudget: Long? = changedBudget
+    @field:Column(nullable = false)
+    open var changedBudget: Long = changedBudget
         protected set
 
     @field:CreatedDate
@@ -66,11 +67,17 @@ open class BudgetChange @JvmOverloads constructor(
         request = budgetRequest
     }
 
-    fun updateChange(request: BudgetChangeUpdateRequest, user: User) {
+    fun updateChange(
+        userName: String,
+        changeBudget: Long,
+        changedBudget: Long,
+        reason: String?,
+        user: User,
+    ) {
         this.user = user
-        userName = request.userName
-        changeBudget = request.changeBudget
-        changedBudget = request.changedBudget
-        reason = request.reason
+        this.userName = userName
+        this.changeBudget = changeBudget
+        this.changedBudget = changedBudget
+        this.reason = reason
     }
 }

@@ -278,6 +278,7 @@ class BudgetChangeControllerTest {
 
         given(budgetChange.getUser()).willReturn(user);
         given(user.getId()).willReturn(testUserId);
+        given(user.getEmail()).willReturn("user1@example.com");
 
         given(budgetChange.getChangeBudget()).willReturn(5000L);
         given(budgetChange.getChangedBudget()).willReturn(9500L);

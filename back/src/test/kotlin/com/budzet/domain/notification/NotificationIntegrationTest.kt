@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
@@ -37,6 +38,7 @@ import java.util.*
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class NotificationIntegrationTest {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var notifications: NotificationRepository

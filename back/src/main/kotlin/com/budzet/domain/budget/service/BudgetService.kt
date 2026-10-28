@@ -58,13 +58,14 @@ class BudgetService(
         }
         val room = findByRoomIdWithLock(roomId)
         room.updateTotalBudget(budgetUpdateRequest.totalBudget, budgetUpdateRequest.budgetType)
+        val changeBudget = requireNotNull(budgetUpdateRequest.totalBudget)
         val budgetChange = BudgetChange(
             room = room,
             user = connection.user,
             userName = connection.user.name,
             type = requireNotNull(budgetUpdateRequest.budgetType),
             reason = budgetUpdateRequest.reason,
-            changeBudget = budgetUpdateRequest.totalBudget,
+            changeBudget = changeBudget,
         )
         room.addBudgetChange(budgetChange)
         budgetChangeRepository.save(budgetChange)

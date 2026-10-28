@@ -329,8 +329,7 @@ class BudgetChangeIntegrationTest {
         assertEquals("테스트 예산 신청", reference.getRequest().getReason());
         assertTrue(Hibernate.isInitialized(reference.getRequest()));
         User user = fixture.actor().user();
-        reference.updateChange(new BudgetChangeUpdateRequest(
-                6000L, 2500L, user.getName(), user.getEmail(), "변경 감지 확인"), user);
+        reference.updateChange(user.getName(), 6000L, 2500L, "변경 감지 확인", user);
         reference.getRequest().updateRequest(reference, user);
         entityManager.flush();
         entityManager.clear();

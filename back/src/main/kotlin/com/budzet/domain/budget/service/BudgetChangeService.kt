@@ -52,14 +52,21 @@ class BudgetChangeService(
         if (request.status != BudgetRequestType.APPROVE) {
             throw BusinessException(ErrorCode.BUDGET_REQUEST_NOT_APPROVED)
         }
+
+        val requestedAmount = requireNotNull(request.requestedAmount)
+        val changedBudget = createRequest.changedBudget
+            ?: throw BusinessException(
+                ErrorCode.BAD_REQUEST,
+                "입력된 금액이 올바르지 않습니다.",
+            )
         val budgetChange = BudgetChange(
             room = room,
             user = connection.user,
             userName = connection.user.name,
             type = BudgetType.SETTLEMENT,
             reason = createRequest.reason,
-            changeBudget = request.requestedAmount,
-            changedBudget = createRequest.changedBudget,
+            changeBudget = requestedAmount,
+            changedBudget = changedBudget,
         )
         budgetChange.addBudgetRequest(request)
         // 신청 상태 변경: 승인 -> 정산
@@ -106,8 +113,10 @@ class BudgetChangeService(
         if (connection.authority != Authority.OWNER) {
             throw BusinessException(ErrorCode.FORBIDDEN_ACCESS)
         }
+        val userName = requireNotNull(updateRequest.userName)
+        val userEmail = requireNotNull(updateRequest.userEmail)
         val user = userRepository.findByNameAndEmail(
-            requireNotNull(updateRequest.userName), requireNotNull(updateRequest.userEmail),
+            userName, userEmail,
         )?: throw BusinessException(ErrorCode.BAD_REQUEST, "유저 이름과 이메일이 일치하지 않습니다.")
         budgetService.validateRoomMember(roomId, requireNotNull(user.id))
         val budgetChange = budgetChangeRepository.findByIdOrNull(changeId)
@@ -119,15 +128,18 @@ class BudgetChangeService(
             throw BusinessException(ErrorCode.BAD_REQUEST, "유효한 정산내역이 아닙니다.")
         }
         val room = budgetService.findByRoomIdWithLock(roomId)
+        val changeBudget = requireNotNull(updateRequest.changeBudget)
         // 신청 금액 증가분이 현재 가용예산을 초과할 수 없다.
-        val resultAmount = requireNotNull(updateRequest.changeBudget) - requireNotNull(budgetChange.changeBudget)
+        val resultAmount = changeBudget - budgetChange.changeBudget
         if (resultAmount > 0 && requireNotNull(room.availableBudget) < resultAmount) {
             throw BusinessException(ErrorCode.REQUEST_AMOUNT_OVER_BUDGET)
         }
+        val changedBudget = requireNotNull(updateRequest.changedBudget)
+        val reason = requireNotNull(updateRequest.reason)
         // 수정 전 정산 금액 - 수정 후 정산 금액의 차액을 실제·가용예산에 반영한다.
-        val resultChanged = requireNotNull(budgetChange.changedBudget) - requireNotNull(updateRequest.changedBudget)
+        val resultChanged = budgetChange.changedBudget - changedBudget
         room.updateTotalBudget(resultChanged)
-        budgetChange.updateChange(updateRequest, user)
+        budgetChange.updateChange(userName, changeBudget, changedBudget, reason, user)
         budgetChange.request?.updateRequest(budgetChange, user)
         return BudgetChangeUpdateResponse.from(budgetChange)
     }

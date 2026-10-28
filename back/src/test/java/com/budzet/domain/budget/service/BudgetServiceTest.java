@@ -360,6 +360,7 @@ class BudgetServiceTest {
                 );
 
         User user = mock(User.class);
+        when(user.getName()).thenReturn("테스트 사용자");
         UserRoomConnection connection =
                 mock(UserRoomConnection.class);
         Room room = mock(Room.class);
@@ -415,6 +416,7 @@ class BudgetServiceTest {
                 );
 
         User user = mock(User.class);
+        when(user.getName()).thenReturn("테스트 사용자");
         UserRoomConnection connection =
                 mock(UserRoomConnection.class);
         Room room = mock(Room.class);
