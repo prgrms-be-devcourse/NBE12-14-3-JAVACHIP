@@ -13,6 +13,7 @@ import com.budzet.global.exception.BusinessException
 import com.budzet.global.exception.ErrorCode
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import kotlin.jvm.optionals.getOrNull
 
 @Service
 class UserRoomConnectionService(
@@ -23,8 +24,8 @@ class UserRoomConnectionService(
     @Transactional(readOnly = true)
     fun getConnection(roomId: Long, actorId: Long, userId: Long): UserRoomConnection {
         validateRoomMember(roomId, actorId)
-        return userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        return userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId).getOrNull()
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
     }
 
     @Transactional(readOnly = true)
@@ -34,22 +35,22 @@ class UserRoomConnectionService(
     }
 
     private fun validateRoomMember(roomId: Long, actorId: Long) {
-        if (!userRoomConnectionRepository.existsById(UserRoomConnectionId(actorId, roomId))) {
+        if (!userRoomConnectionRepository.existsById(UserRoomConnectionId(user = actorId, room = roomId))) {
             throw BusinessException(ErrorCode.USER_NOT_JOINED_ROOM)
         }
     }
 
     @Transactional
     fun kickMember(actorId: Long, roomId: Long, targetUserId: Long) {
-        val room = roomRepository.findByWithLock(roomId)
-            .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
-        val actorConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        val room = roomRepository.findByWithLock(roomId).getOrNull()
+            ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
+        val actorConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId).getOrNull()
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (actorConnection.authority != Authority.OWNER && actorConnection.authority != Authority.OPERATOR) {
             throw BusinessException(ErrorCode.ROOM_MANAGER_REQUIRED)
         }
-        val targetConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        val targetConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId).getOrNull()
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (targetConnection.authority == Authority.OWNER) {
             throw BusinessException(ErrorCode.INVALID_AUTHORITY)
         }
@@ -59,10 +60,10 @@ class UserRoomConnectionService(
 
     @Transactional
     fun leaveRoom(roomId: Long, userId: Long) {
-        val room = roomRepository.findByWithLock(roomId)
-            .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
-        val connection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        val room = roomRepository.findByWithLock(roomId).getOrNull()
+            ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
+        val connection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId).getOrNull()
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (connection.authority == Authority.OWNER) {
             throw BusinessException(ErrorCode.CONFLICT)
         }
