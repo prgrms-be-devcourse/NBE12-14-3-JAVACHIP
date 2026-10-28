@@ -79,7 +79,7 @@ class RoomTransactionIntegrationTest {
                 .orElseThrow().getCreatedAt();
         LocalDateTime originalConnectionCreatedAt = connectionRepository
                 .findByUser_IdAndRoom_Id(owner.getId(), existingRoom.getId())
-                .orElseThrow().getCreatedAt();
+                .getCreatedAt();
 
         User deletedUser = createUser();
         Long deletedUserId = deletedUser.getId();
@@ -110,7 +110,7 @@ class RoomTransactionIntegrationTest {
         assertThat(preservedRoom.getCurrency()).isEqualTo(Currency.USD);
         assertThat(preservedRoom.getCreatedAt()).isEqualTo(originalRoomCreatedAt);
         UserRoomConnection preservedConnection = connectionRepository
-                .findByUser_IdAndRoom_Id(owner.getId(), existingRoom.getId()).orElseThrow();
+                .findByUser_IdAndRoom_Id(owner.getId(), existingRoom.getId());
         assertThat(preservedConnection.getAuthority()).isEqualTo(Authority.OWNER);
         assertThat(preservedConnection.isJoined()).isTrue();
         assertThat(preservedConnection.getCreatedAt()).isEqualTo(originalConnectionCreatedAt);

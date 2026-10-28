@@ -87,7 +87,7 @@ class MemberDepartureIntegrationTest {
         assertBudget(f.room().getId(), 9_500L, 6_500L);
         depart(f, kick);
 
-        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), f.room().getId())).isEmpty();
+        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), f.room().getId())).isNull();
         for (Long id : List.of(pending.getId(), rejected.getId(), approved.getId(), secondApproved.getId())) {
             assertThat(requestRepository.existsById(id)).isFalse();
         }
@@ -105,7 +105,7 @@ class MemberDepartureIntegrationTest {
         assertThat(requestRepository.existsById(otherRequest.getId())).isTrue();
         assertThat(requestRepository.findById(otherRoomRequest.getId()).orElseThrow().getStatus())
                 .isEqualTo(BudgetRequestType.APPROVE);
-        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), otherRoom.getId())).isPresent();
+        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), otherRoom.getId())).isNotNull();
         assertBudget(f.room().getId(), 9_500L, 9_500L);
         assertBudget(otherRoom.getId(), 5_000L, 4_100L);
         // 중복 호출로 예약 예산이 두 번 반환되지 않는다.
@@ -124,7 +124,7 @@ class MemberDepartureIntegrationTest {
 
         assertThatThrownBy(() -> depart(f, kick)).isInstanceOf(IllegalStateException.class);
 
-        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), f.room().getId())).isPresent();
+        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), f.room().getId())).isNotNull();
         assertThat(requestRepository.findById(approved.getId()).orElseThrow().getStatus())
                 .isEqualTo(BudgetRequestType.APPROVE);
         assertBudget(f.room().getId(), 10_000L, 8_000L);
@@ -136,7 +136,7 @@ class MemberDepartureIntegrationTest {
     void departureWithoutRequests(boolean kick) {
         Fixture f = fixture();
         depart(f, kick);
-        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), f.room().getId())).isEmpty();
+        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), f.room().getId())).isNull();
         assertBudget(f.room().getId(), 10_000L, 10_000L);
     }
 

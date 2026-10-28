@@ -59,7 +59,7 @@ class ReceiptOcrServiceTest {
     private val client = mock(ReceiptOcrClient::class.java)
     private val service = ReceiptOcrService(requests, rooms, members, client, ReceiptAmountParser(), ReceiptOcrLimiter())
     private fun fixture(userId: Long = 1, status: BudgetRequestType = BudgetRequestType.APPROVE) {
-        `when`(members.findByUser_IdAndRoom_Id(1, 2)).thenReturn(Optional.of(mock(UserRoomConnection::class.java)))
+        `when`(members.findByUser_IdAndRoom_Id(1, 2)).thenReturn(mock(UserRoomConnection::class.java))
         `when`(requests.findDtoById(2, 3)).thenReturn(BudgetRequestResponse(3, 2, userId,"테스트","식비",20000,status,null,null,null))
         `when`(rooms.findById(2)).thenReturn(Optional.of(Room.create("테스트",30000,Currency.KRW)))
     }
@@ -69,7 +69,7 @@ class ReceiptOcrServiceTest {
         return MockMultipartFile("file","receipt.png","image/png",out.toByteArray())
     }
     @Test fun nonMemberCannotSendImage() {
-        `when`(members.findByUser_IdAndRoom_Id(1,2)).thenReturn(Optional.empty())
+        `when`(members.findByUser_IdAndRoom_Id(1,2)).thenReturn(null)
         assertEquals(ErrorCode.USER_NOT_JOINED_ROOM, assertThrows(BusinessException::class.java) { service.analyze(2,3,1,image()) }.errorCode)
         verifyNoInteractions(client)
     }

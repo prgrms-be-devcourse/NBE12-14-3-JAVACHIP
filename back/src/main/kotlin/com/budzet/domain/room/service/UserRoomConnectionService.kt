@@ -24,7 +24,7 @@ class UserRoomConnectionService(
     fun getConnection(roomId: Long, actorId: Long, userId: Long): UserRoomConnection {
         validateRoomMember(roomId, actorId)
         return userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
     }
 
     @Transactional(readOnly = true)
@@ -42,14 +42,14 @@ class UserRoomConnectionService(
     @Transactional
     fun kickMember(actorId: Long, roomId: Long, targetUserId: Long) {
         val room = roomRepository.findByWithLock(roomId)
-            .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
         val actorConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (actorConnection.authority != Authority.OWNER && actorConnection.authority != Authority.OPERATOR) {
             throw BusinessException(ErrorCode.ROOM_MANAGER_REQUIRED)
         }
         val targetConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (targetConnection.authority == Authority.OWNER) {
             throw BusinessException(ErrorCode.INVALID_AUTHORITY)
         }
@@ -60,9 +60,9 @@ class UserRoomConnectionService(
     @Transactional
     fun leaveRoom(roomId: Long, userId: Long) {
         val room = roomRepository.findByWithLock(roomId)
-            .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
         val connection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (connection.authority == Authority.OWNER) {
             throw BusinessException(ErrorCode.CONFLICT)
         }

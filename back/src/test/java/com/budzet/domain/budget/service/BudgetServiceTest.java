@@ -65,7 +65,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(roomRepository.findById(roomId))
                 .thenReturn(Optional.of(room));
@@ -103,7 +103,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(roomRepository.findById(roomId))
                 .thenReturn(Optional.empty());
@@ -135,7 +135,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(roomRepository.findById(roomId))
                 .thenReturn(Optional.of(room));
@@ -168,7 +168,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(roomRepository.findById(roomId))
                 .thenReturn(Optional.of(room));
@@ -202,7 +202,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         // when
         BusinessException exception = assertThrows(
@@ -242,7 +242,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(budgetChangeRepository
                 .findAllByRoomIdOrderByCreatedAtDesc(roomId))
@@ -291,7 +291,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(budgetChangeRepository
                 .findAllByRoomIdOrderByCreatedAtDesc(roomId))
@@ -319,7 +319,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         // when
         BusinessException exception = assertThrows(
@@ -366,7 +366,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(connection.getAuthority())
                 .thenReturn(Authority.OWNER);
@@ -374,7 +374,7 @@ class BudgetServiceTest {
         when(connection.getUser()).thenReturn(user);
 
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.of(room));
+                .thenReturn(room);
 
         when(room.getId()).thenReturn(roomId);
         when(room.getTotalBudget()).thenReturn(15000L);
@@ -421,7 +421,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(connection.getAuthority())
                 .thenReturn(Authority.OPERATOR);
@@ -429,7 +429,7 @@ class BudgetServiceTest {
         when(connection.getUser()).thenReturn(user);
 
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.of(room));
+                .thenReturn(room);
 
         when(room.getId()).thenReturn(roomId);
         when(room.getTotalBudget()).thenReturn(8000L);
@@ -470,7 +470,7 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(connection.getAuthority())
                 .thenReturn(Authority.MEMBER);
@@ -514,13 +514,13 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(connection.getAuthority())
                 .thenReturn(Authority.OWNER);
 
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         // when
         BusinessException exception = assertThrows(
@@ -560,13 +560,13 @@ class BudgetServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(connection.getAuthority())
                 .thenReturn(Authority.OWNER);
 
         when(roomRepository.findByWithLock(roomId))
-                .thenReturn(Optional.of(room));
+                .thenReturn(room);
 
         // 실제 예산 차감 메서드에서 가용예산 부족 예외가 발생하는 상황을 모의
         doThrow(new BusinessException(

@@ -1,19 +1,6 @@
 package com.budzet.domain.room.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
-
-import com.budzet.domain.room.dto.RoomCreateRequest;
-import com.budzet.domain.room.dto.RoomCreateResponse;
-import com.budzet.domain.room.dto.RoomDetailResponse;
-import com.budzet.domain.room.dto.RoomListResponse;
-import com.budzet.domain.room.dto.RoomUpdateRequest;
-import com.budzet.domain.room.dto.AuthorityChangeRequest;
+import com.budzet.domain.room.dto.*;
 import com.budzet.domain.room.entity.Authority;
 import com.budzet.domain.room.entity.Currency;
 import com.budzet.domain.room.entity.Room;
@@ -37,7 +24,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
-import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RoomServiceTest {
@@ -177,7 +168,7 @@ class RoomServiceTest {
 
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
         when(connection.getAuthority()).thenReturn(Authority.OWNER);
 
         RoomDetailResponse response = roomService.updateRoom(
@@ -206,7 +197,7 @@ class RoomServiceTest {
 
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
         when(connection.getAuthority()).thenReturn(authority);
 
         BusinessException exception = assertThrows(
@@ -252,7 +243,7 @@ class RoomServiceTest {
 
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -278,7 +269,7 @@ class RoomServiceTest {
 
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
         when(connection.getAuthority()).thenReturn(Authority.OWNER);
 
         roomService.deleteRoom(userId, roomId);
@@ -311,7 +302,7 @@ class RoomServiceTest {
 
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -333,7 +324,7 @@ class RoomServiceTest {
 
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
         when(connection.getAuthority()).thenReturn(authority);
 
         BusinessException exception = assertThrows(
@@ -358,10 +349,10 @@ class RoomServiceTest {
                 ? Authority.MEMBER : Authority.OPERATOR;
 
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
-                .thenReturn(Optional.of(actorConnection));
+                .thenReturn(actorConnection);
         when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId))
-                .thenReturn(Optional.of(targetConnection));
+                .thenReturn(targetConnection);
         when(targetConnection.getAuthority()).thenReturn(previousAuthority);
 
         roomService.changeAuthority(actorId, roomId, targetUserId,
@@ -380,7 +371,7 @@ class RoomServiceTest {
         Long targetUserId = 2L;
         UserRoomConnection actorConnection = mock(UserRoomConnection.class);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
-                .thenReturn(Optional.of(actorConnection));
+                .thenReturn(actorConnection);
         when(actorConnection.getAuthority()).thenReturn(authority);
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -399,7 +390,7 @@ class RoomServiceTest {
         Long roomId = 10L;
         Long targetUserId = 2L;
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> roomService.changeAuthority(actorId, roomId, targetUserId,
@@ -417,10 +408,10 @@ class RoomServiceTest {
         Long targetUserId = 2L;
         UserRoomConnection actorConnection = mock(UserRoomConnection.class);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
-                .thenReturn(Optional.of(actorConnection));
+                .thenReturn(actorConnection);
         when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> roomService.changeAuthority(actorId, roomId, targetUserId,
@@ -439,10 +430,10 @@ class RoomServiceTest {
         UserRoomConnection actorConnection = mock(UserRoomConnection.class);
         UserRoomConnection targetConnection = mock(UserRoomConnection.class);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
-                .thenReturn(Optional.of(actorConnection));
+                .thenReturn(actorConnection);
         when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId))
-                .thenReturn(Optional.of(targetConnection));
+                .thenReturn(targetConnection);
         when(targetConnection.getAuthority()).thenReturn(Authority.OWNER);
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -464,10 +455,10 @@ class RoomServiceTest {
         UserRoomConnection actorConnection = mock(UserRoomConnection.class);
         UserRoomConnection targetConnection = mock(UserRoomConnection.class);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
-                .thenReturn(Optional.of(actorConnection));
+                .thenReturn(actorConnection);
         when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId))
-                .thenReturn(Optional.of(targetConnection));
+                .thenReturn(targetConnection);
         when(targetConnection.getAuthority()).thenReturn(targetAuthority);
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -492,13 +483,13 @@ class RoomServiceTest {
 
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(
                 actorId, roomId
-        )).thenReturn(Optional.of(actorConnection));
+        )).thenReturn(actorConnection);
 
         when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
 
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(
                 targetUserId, roomId
-        )).thenReturn(Optional.of(targetConnection));
+        )).thenReturn(targetConnection);
 
         when(targetConnection.getAuthority()).thenReturn(targetAuthority);
 
@@ -524,7 +515,7 @@ class RoomServiceTest {
 
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(
                 actorId, roomId
-        )).thenReturn(Optional.of(actorConnection));
+        )).thenReturn(actorConnection);
 
         when(actorConnection.getAuthority()).thenReturn(authority);
 
@@ -553,7 +544,7 @@ class RoomServiceTest {
         Long roomId = 10L;
         Long targetUserId = 2L;
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> roomService.delegateOwner(actorId, roomId, targetUserId));
@@ -569,7 +560,7 @@ class RoomServiceTest {
         Long roomId = 10L;
         UserRoomConnection actorConnection = mock(UserRoomConnection.class);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId))
-                .thenReturn(Optional.of(actorConnection));
+                .thenReturn(actorConnection);
         when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -590,13 +581,13 @@ class RoomServiceTest {
 
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(
                 actorId, roomId
-        )).thenReturn(Optional.of(actorConnection));
+        )).thenReturn(actorConnection);
 
         when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
 
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(
                 targetUserId, roomId
-        )).thenReturn(Optional.empty());
+        )).thenReturn(null);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -627,13 +618,13 @@ class RoomServiceTest {
 
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(
                 actorId, roomId
-        )).thenReturn(Optional.of(actorConnection));
+        )).thenReturn(actorConnection);
 
         when(actorConnection.getAuthority()).thenReturn(Authority.OWNER);
 
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(
                 targetUserId, roomId
-        )).thenReturn(Optional.of(targetConnection));
+        )).thenReturn(targetConnection);
 
         when(targetConnection.getAuthority()).thenReturn(Authority.OWNER);
 

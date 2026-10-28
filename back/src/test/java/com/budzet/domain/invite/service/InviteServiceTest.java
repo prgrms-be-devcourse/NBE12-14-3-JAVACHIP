@@ -67,7 +67,7 @@ class InviteServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(connection.getAuthority())
                 .thenReturn(Authority.OWNER);
@@ -102,7 +102,7 @@ class InviteServiceTest {
 
         when(userRoomConnectionRepository
                 .findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
 
         when(connection.getAuthority())
                 .thenReturn(Authority.MEMBER);
@@ -216,9 +216,9 @@ class InviteServiceTest {
         when(invite.getExpireAt()).thenReturn(LocalDateTime.now().plusHours(1));
         when(invite.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
-        when(roomRepository.findByWithLock(roomId)).thenReturn(Optional.of(room));
+        when(roomRepository.findByWithLock(roomId)).thenReturn(room);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
         when(userRepository.getReferenceById(userId)).thenReturn(user);
         when(user.getId()).thenReturn(userId);
         when(userRoomConnectionRepository.save(any(UserRoomConnection.class)))
@@ -260,7 +260,7 @@ class InviteServiceTest {
         when(invite.getExpireAt()).thenReturn(LocalDateTime.now().minusSeconds(1));
         when(invite.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
-        when(roomRepository.findByWithLock(roomId)).thenReturn(Optional.of(room));
+        when(roomRepository.findByWithLock(roomId)).thenReturn(room);
 
         assertThatThrownBy(() -> inviteService.joinRoom(code, 1L))
                 .isInstanceOf(BusinessException.class)
@@ -282,9 +282,9 @@ class InviteServiceTest {
         when(invite.getExpireAt()).thenReturn(LocalDateTime.now().plusHours(1));
         when(invite.getRoom()).thenReturn(room);
         when(room.getId()).thenReturn(roomId);
-        when(roomRepository.findByWithLock(roomId)).thenReturn(Optional.of(room));
+        when(roomRepository.findByWithLock(roomId)).thenReturn(room);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId))
-                .thenReturn(Optional.of(mock(UserRoomConnection.class)));
+                .thenReturn(mock(UserRoomConnection.class));
 
         assertThatThrownBy(() -> inviteService.joinRoom(code, userId))
                 .isInstanceOf(BusinessException.class)
@@ -350,7 +350,7 @@ class InviteServiceTest {
     private void mockInviteOwner(Long roomId) {
         UserRoomConnection connection = mock(UserRoomConnection.class);
         when(userRoomConnectionRepository.findByUser_IdAndRoom_Id(1L, roomId))
-                .thenReturn(Optional.of(connection));
+                .thenReturn(connection);
         when(connection.getAuthority()).thenReturn(Authority.OWNER);
     }
 }

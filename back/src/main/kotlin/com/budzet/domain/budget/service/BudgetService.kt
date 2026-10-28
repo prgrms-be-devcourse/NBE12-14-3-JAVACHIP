@@ -1,6 +1,9 @@
 package com.budzet.domain.budget.service
 
-import com.budzet.domain.budget.dto.*
+import com.budzet.domain.budget.dto.BudgetHistoryResponse
+import com.budzet.domain.budget.dto.BudgetResponse
+import com.budzet.domain.budget.dto.BudgetUpdateRequest
+import com.budzet.domain.budget.dto.BudgetUpdateResponse
 import com.budzet.domain.budget.entity.BudgetChange
 import com.budzet.domain.budget.repository.BudgetChangeRepository
 import com.budzet.domain.room.entity.Authority
@@ -12,6 +15,7 @@ import com.budzet.global.exception.BusinessException
 import com.budzet.global.exception.ErrorCode
 import jakarta.persistence.LockTimeoutException
 import org.springframework.dao.PessimisticLockingFailureException
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
@@ -55,21 +59,25 @@ class BudgetService(
         val room = findByRoomIdWithLock(roomId)
         room.updateTotalBudget(budgetUpdateRequest.totalBudget, budgetUpdateRequest.budgetType)
         val budgetChange = BudgetChange(
-            room, connection.user, connection.user.name, requireNotNull(budgetUpdateRequest.budgetType),
-            budgetUpdateRequest.reason, budgetUpdateRequest.totalBudget,
+            room = room,
+            user = connection.user,
+            userName = connection.user.name,
+            type = requireNotNull(budgetUpdateRequest.budgetType),
+            reason = budgetUpdateRequest.reason,
+            changeBudget = budgetUpdateRequest.totalBudget,
         )
         room.addBudgetChange(budgetChange)
         budgetChangeRepository.save(budgetChange)
         return BudgetUpdateResponse.from(room)
     }
 
-    fun findByRoomId(roomId: Long): Room = roomRepository.findById(roomId)
-        .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+    fun findByRoomId(roomId: Long): Room = roomRepository.findByIdOrNull(roomId)
+        ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
 
     fun findByRoomIdWithLock(roomId: Long): Room = roomRepository.findByWithLock(roomId)
-        .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+        ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
 
     fun validateRoomMember(roomId: Long, userId: Long): UserRoomConnection =
         userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.USER_NOT_JOINED_ROOM) }
+            ?: throw BusinessException(ErrorCode.USER_NOT_JOINED_ROOM)
 }

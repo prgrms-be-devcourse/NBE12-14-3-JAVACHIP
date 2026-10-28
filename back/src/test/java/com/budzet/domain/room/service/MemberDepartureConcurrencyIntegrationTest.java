@@ -71,7 +71,7 @@ class MemberDepartureConcurrencyIntegrationTest extends MemberDepartureIntegrati
         Throwable secondFailure = runInOrder(f, departureFirst ? departure : settlement,
                 departureFirst ? settlement : departure);
 
-        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), f.room().getId())).isEmpty();
+        assertThat(connections.findByUser_IdAndRoom_Id(f.member().getId(), f.room().getId())).isNull();
         if (departureFirst) {
             assertThat(secondFailure).isInstanceOf(BusinessException.class);
             assertThat(requestRepository.existsById(request.getId())).isFalse();
@@ -134,7 +134,7 @@ class MemberDepartureConcurrencyIntegrationTest extends MemberDepartureIntegrati
         CountDownLatch firstChanged = new CountDownLatch(1);
         CountDownLatch commitFirst = new CountDownLatch(1);
         Future<?> firstFuture = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            rooms.findByWithLock(f.room().getId()).orElseThrow();
+            assertThat(rooms.findByWithLock(f.room().getId())).isNotNull();
             first.run();
             firstChanged.countDown();
             try {

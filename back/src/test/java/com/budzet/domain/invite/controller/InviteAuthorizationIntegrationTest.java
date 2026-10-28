@@ -270,7 +270,7 @@ class InviteAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.data.roomId").value(room.getId()))
                 .andExpect(jsonPath("$.data.authority").value("MEMBER"));
         assertEquals(Authority.MEMBER, membershipRepository
-                .findByUser_IdAndRoom_Id(outsider.getId(), room.getId()).orElseThrow().getAuthority());
+                .findByUser_IdAndRoom_Id(outsider.getId(), room.getId()).getAuthority());
     }
 
     @Test
@@ -327,7 +327,7 @@ class InviteAuthorizationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"authority\":\"OPERATOR\"}"))
                 .andExpect(status().is(role.equals("outsider") ? 404 : 403));
         assertEquals(Authority.MEMBER, membershipRepository
-                .findByUser_IdAndRoom_Id(member.getId(), room.getId()).orElseThrow().getAuthority());
+                .findByUser_IdAndRoom_Id(member.getId(), room.getId()).getAuthority());
     }
 
     @Test
@@ -339,13 +339,13 @@ class InviteAuthorizationIntegrationTest {
                             .contentType(MediaType.APPLICATION_JSON).content("{\"authority\":\"" + role + "\"}"))
                     .andExpect(status().isOk());
             assertEquals(Authority.valueOf(role), membershipRepository
-                    .findByUser_IdAndRoom_Id(member.getId(), room.getId()).orElseThrow().getAuthority());
+                    .findByUser_IdAndRoom_Id(member.getId(), room.getId()).getAuthority());
         }
         mockMvc.perform(patch(endpoint("members/{userId}/authority"))
                         .header("Authorization", "Bearer " + ownerToken)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"authority\":\"OWNER\"}"))
                 .andExpect(status().isBadRequest());
         assertEquals(Authority.MEMBER, membershipRepository
-                .findByUser_IdAndRoom_Id(member.getId(), room.getId()).orElseThrow().getAuthority());
+                .findByUser_IdAndRoom_Id(member.getId(), room.getId()).getAuthority());
     }
 }

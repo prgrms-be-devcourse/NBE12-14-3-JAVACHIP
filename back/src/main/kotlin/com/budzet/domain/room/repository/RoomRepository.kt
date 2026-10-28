@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.jpa.repository.QueryHints
 import org.springframework.data.repository.query.Param
-import java.util.Optional
+import java.util.*
 
 interface RoomRepository : JpaRepository<Room, Long> {
     @Query("""
@@ -39,5 +39,5 @@ interface RoomRepository : JpaRepository<Room, Long> {
         FROM Room room
         WHERE room.id = :roomId
     """)
-    fun findByWithLock(@Param("roomId") roomId: Long): Optional<Room>
+    fun findByWithLock(@Param("roomId") roomId: Long): Room?
 }

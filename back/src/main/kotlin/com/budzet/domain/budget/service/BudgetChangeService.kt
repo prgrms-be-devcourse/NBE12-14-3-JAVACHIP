@@ -12,6 +12,7 @@ import com.budzet.global.exception.BusinessException
 import com.budzet.global.exception.ErrorCode
 import jakarta.persistence.LockTimeoutException
 import org.springframework.dao.PessimisticLockingFailureException
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
@@ -38,8 +39,8 @@ class BudgetChangeService(
     ): BudgetChangeCreateResponse {
         val room = budgetService.findByRoomIdWithLock(roomId)
         val connection = budgetService.validateRoomMember(roomId, userId)
-        val request = budgetRequestRepository.findById(requestId)
-            .orElseThrow { BusinessException(ErrorCode.BUDGET_REQUEST_NOT_FOUND) }
+        val request = budgetRequestRepository.findByIdOrNull(requestId)
+            ?: throw BusinessException(ErrorCode.BUDGET_REQUEST_NOT_FOUND)
         if (request.room.id != roomId) {
             throw BusinessException(ErrorCode.BAD_REQUEST, "해당 모임의 신청건이 아닙니다.")
         }
@@ -52,8 +53,13 @@ class BudgetChangeService(
             throw BusinessException(ErrorCode.BUDGET_REQUEST_NOT_APPROVED)
         }
         val budgetChange = BudgetChange(
-            room, connection.user, connection.user.name, BudgetType.SETTLEMENT,
-            createRequest.reason, request.requestedAmount, createRequest.changedBudget,
+            room = room,
+            user = connection.user,
+            userName = connection.user.name,
+            type = BudgetType.SETTLEMENT,
+            reason = createRequest.reason,
+            changeBudget = request.requestedAmount,
+            changedBudget = createRequest.changedBudget,
         )
         budgetChange.addBudgetRequest(request)
         // 신청 상태 변경: 승인 -> 정산
@@ -76,8 +82,8 @@ class BudgetChangeService(
     @Transactional(readOnly = true)
     fun budgetChangeDetail(roomId: Long, userId: Long, changeId: Long): BudgetChangeDetailResponse {
         budgetService.validateRoomMember(roomId, userId)
-        val budgetChange = budgetChangeRepository.findById(changeId)
-            .orElseThrow { BusinessException(ErrorCode.BUDGET_CHANGE_NOT_FOUND) }
+        val budgetChange = budgetChangeRepository.findByIdOrNull(changeId)
+            ?: throw BusinessException(ErrorCode.BUDGET_CHANGE_NOT_FOUND)
         if (budgetChange.room.id != roomId) {
             throw BusinessException(ErrorCode.BAD_REQUEST, "해당 모임의 정산건이 아닙니다.")
         }
@@ -102,10 +108,10 @@ class BudgetChangeService(
         }
         val user = userRepository.findByNameAndEmail(
             requireNotNull(updateRequest.userName), requireNotNull(updateRequest.userEmail),
-        ).orElseThrow { BusinessException(ErrorCode.BAD_REQUEST, "유저 이름과 이메일이 일치하지 않습니다.") }
+        )?: throw BusinessException(ErrorCode.BAD_REQUEST, "유저 이름과 이메일이 일치하지 않습니다.")
         budgetService.validateRoomMember(roomId, requireNotNull(user.id))
-        val budgetChange = budgetChangeRepository.findById(changeId)
-            .orElseThrow { BusinessException(ErrorCode.BUDGET_CHANGE_NOT_FOUND) }
+        val budgetChange = budgetChangeRepository.findByIdOrNull(changeId)
+            ?: throw BusinessException(ErrorCode.BUDGET_CHANGE_NOT_FOUND)
         if (budgetChange.type != BudgetType.SETTLEMENT) {
             throw BusinessException(ErrorCode.BAD_REQUEST, "정산(SETTLEMENT) 타입의 내역만 수정할 수 있습니다.")
         }

@@ -52,7 +52,7 @@ class RoomService(
         val room = roomRepository.findById(roomId)
             .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
         val connection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (connection.authority != Authority.OWNER) {
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }
@@ -65,7 +65,7 @@ class RoomService(
         val room = roomRepository.findById(roomId)
             .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
         val connection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (connection.authority != Authority.OWNER) {
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }
@@ -75,12 +75,12 @@ class RoomService(
     @Transactional
     fun changeAuthority(actorId: Long, roomId: Long, targetUserId: Long, request: AuthorityChangeRequest) {
         val actorConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (actorConnection.authority != Authority.OWNER) {
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }
         val targetConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (targetConnection.authority == Authority.OWNER) {
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }
@@ -93,12 +93,12 @@ class RoomService(
     @Transactional
     fun delegateOwner(actorId: Long, roomId: Long, targetUserId: Long) {
         val actorConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (actorConnection.authority != Authority.OWNER) {
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }
         val targetConnection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(targetUserId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         if (targetConnection.authority == Authority.OWNER) {
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }

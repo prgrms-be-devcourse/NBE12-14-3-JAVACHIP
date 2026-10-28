@@ -141,7 +141,7 @@ class RoomIntegrationTest {
         assertThat(savedRoom.getCreatedAt()).isNotNull();
 
         UserRoomConnection connection = connectionRepository
-                .findByUser_IdAndRoom_Id(user.getId(), roomId).orElseThrow();
+                .findByUser_IdAndRoom_Id(user.getId(), roomId);
         assertThat(connection.getUser().getId()).isEqualTo(user.getId());
         assertThat(connection.getRoom().getId()).isEqualTo(roomId);
         assertThat(connection.getAuthority()).isEqualTo(Authority.OWNER);
@@ -345,7 +345,7 @@ class RoomIntegrationTest {
             } else {
                 actor = userRepository.findById(related.memberId()).orElseThrow();
                 UserRoomConnection connection = connectionRepository
-                        .findByUser_IdAndRoom_Id(actor.getId(), room.getId()).orElseThrow();
+                        .findByUser_IdAndRoom_Id(actor.getId(), room.getId());
                 connection.changeAuthority(Authority.valueOf(actorType));
                 connectionRepository.save(connection);
             }
@@ -582,7 +582,7 @@ class RoomIntegrationTest {
 
     private void assertAuthority(Room room, User user, Authority expected) {
         UserRoomConnection saved = connectionRepository
-                .findByUser_IdAndRoom_Id(user.getId(), room.getId()).orElseThrow();
+                .findByUser_IdAndRoom_Id(user.getId(), room.getId());
         assertThat(saved.getAuthority()).isEqualTo(expected);
         assertThat(saved.isJoined()).isTrue();
     }

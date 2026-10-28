@@ -33,7 +33,7 @@ class InviteService(
     fun createInvite(roomId: Long, userId: Long): InviteResponse {
         val room = roomRepository.findById(roomId).orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
         val connection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.USER_NOT_JOINED_ROOM) }
+            ?: throw BusinessException(ErrorCode.USER_NOT_JOINED_ROOM)
         if (connection.authority != Authority.OWNER) {
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }
@@ -57,7 +57,7 @@ class InviteService(
     @Transactional(readOnly = true)
     fun getInvites(roomId: Long, actorId: Long): List<InviteResponse> {
         val connection = userRoomConnectionRepository.findByUser_IdAndRoom_Id(actorId, roomId)
-            .orElseThrow { BusinessException(ErrorCode.USER_NOT_JOINED_ROOM) }
+            ?: throw BusinessException(ErrorCode.USER_NOT_JOINED_ROOM)
         if (connection.authority != Authority.OWNER) {
             throw BusinessException(ErrorCode.OWNER_REQUIRED)
         }
@@ -78,13 +78,13 @@ class InviteService(
         // 대상 Room을 잠근 상태로 조회
         val roomId = requireNotNull(invite.room.id)
         val room = roomRepository.findByWithLock(roomId)
-            .orElseThrow { BusinessException(ErrorCode.ROOM_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.ROOM_NOT_FOUND)
         // 잠금 획득 후 만료일이 유효한지 확인
         if (!invite.expireAt.isAfter(LocalDateTime.now())) {
             throw BusinessException(ErrorCode.INVITE_EXPIRED)
         }
         // 이미 참여한 상태인지 확인
-        if (userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId).isPresent) {
+        if (userRoomConnectionRepository.findByUser_IdAndRoom_Id(userId, roomId) != null) {
             throw BusinessException(ErrorCode.USER_ALREADY_JOINED_ROOM)
         }
         // 멤버 참여 처리하기(UserRoomConnection 생성)
